@@ -99,7 +99,7 @@ def get_scores(population):
 
     scores = []
 
-    parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIB_gain, AIA_v0, AIA_gain, AIY_v0, AIY_gain,
+    parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7]
 
     for p in population:
