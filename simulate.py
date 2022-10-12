@@ -68,7 +68,7 @@ def plot_conc(domain):
 
 
 def score_worm(solution):
-    trajectory = solution[0:2, :]
+    trajectory = solution[6:8, :]
     x = trajectory[0, :]
     y = trajectory[1, :]
     delx = origin[0] - x
@@ -91,8 +91,6 @@ def score_worm(solution):
     score += 3 * np.any(origin_dist < 2.5 / 3)
     score += 2 * np.any(origin_dist < 2.5 / 3 * 2)
     score += 1 * np.any(origin_dist < 2.5 / 3 * 3)
-
-
 
     return score
 
@@ -121,7 +119,7 @@ def get_scores(population):
 
 def evolve():
 
-    population = np.random.random(size = (pop_size, 7))*2 - 1
+    population = np.random.random(size = (pop_size, 7))*20 - 10
 
 
     for i in range(n_gens):
@@ -138,7 +136,7 @@ def evolve():
 
         population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 7))*0.2 - 0.1
 
-        population[int(pop_size*0.8):] = np.random.random(size = (pop_size-int(pop_size*0.8), 7))*2 - 1
+        population[int(pop_size*0.8):] = np.random.random(size = (pop_size-int(pop_size*0.8), 7))*20 - 10
 
         print('max: ', np.max(scores), population[0])
         print('mean: ', np.mean(scores))
@@ -149,7 +147,7 @@ origin = np.array([2.5, 0.])
 # starting params from gosh et al
 tm = 0.5 #s
 AIB_v0 = AIA_v0 = AIY_v0 = AWC_v0 = 0
-AWC_gain = AIB_gain = AIA_gain = AIY_gain = 2
+AWC_gain = 2
 AWC_f_a = 4 #1/s
 AWC_f_b = 15 #1/s
 AWC_s_gamma = 2 #1/s
@@ -157,19 +155,19 @@ speed = 0.11 #mm/s
 
 domain = [-3,3]
 
-w_2 = w_3 = w_4 = w_5 = -0.1 # -ve weights
-w_1 = w_6 = w_7 = 0.1 # +ve weights
-parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIB_gain, AIA_v0, AIA_gain, AIY_v0, AIY_gain,
+w_2 = w_3 = w_4 = w_5 = -2 # -ve weights
+w_1 = w_6 = w_7 = 2 # +ve weights
+parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0,
          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7]
 
 
-p = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIB_gain, AIA_v0, AIA_gain, AIY_v0, AIY_gain, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7]
+p = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7]
 t_span = [0, 1200] #s
 
 y0 = [0, 0, 0, 0, 0, 0, 0, 0]
 sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,))
 
-#evolve()
+evolve()
 
 print(score_worm(sol.y))
 plot_conc(domain)

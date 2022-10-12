@@ -17,13 +17,13 @@ def concentration_func(x,y,t):
     dist = np.sqrt(delx**2 + dely**2)
 
     std = 2
-    return gaussian(dist, mu=0, sig=std)
+    return gaussian(dist, mu=0, sig=std)*100
 
 def xdot(t, X, p):
     global theta
     AWC_v, AWC_f, AWC_s, AIB_v, AIA_v, AIY_v, x, y = X
 
-    AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIB_gain, AIA_v0, AIA_gain, AIY_v0, AIY_gain, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7 = p
+    AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7 = p
 
     conc = concentration_func(x, y, t)
 
@@ -33,14 +33,14 @@ def xdot(t, X, p):
     dAWC_v = 1/tm *(-AWC_v + AWC_v0 + np.tanh(-AWC_gain*AWC_i)) # -ve in tanh because downstep in conc activates AWC
 
     AIB_i = w_1*AWC_v + w_4*AIA_v
-    dAIB_v = 1/tm *(-AIB_v + AIB_v0 + np.tanh(AIB_gain*AIB_i))
+    dAIB_v = 1/tm *(-AIB_v + AIB_v0 + np.tanh(AIB_i)) # removed gains as redundant with the weights
 
 
     AIA_i = w_2 * AWC_v + w_5*AIB_v + w_6*AIY_v
-    dAIA_v = 1 / tm * (-AIA_v + AIA_v0 + np.tanh(AIA_gain * AIA_i))
+    dAIA_v = 1 / tm * (-AIA_v + AIA_v0 + np.tanh(AIA_i))
 
     AIY_i = w_3 * AWC_v + w_7 * AIA_v
-    dAIY_v = 1 / tm * (-AIY_v + AIY_v0 + np.tanh(AIY_gain * AIY_i))
+    dAIY_v = 1 / tm * (-AIY_v + AIY_v0 + np.tanh(AIY_i))
 
 
     turn = (np.random.random()*2 - 1) < AIB_v
@@ -54,9 +54,6 @@ def xdot(t, X, p):
         dy = speed * np.sin(theta)
     else:
         dx = dy = 0
-
-
-
 
     return dAWC_v, dAWC_f, dAWC_s, dAIB_v, dAIA_v, dAIY_v, dx, dy
 
