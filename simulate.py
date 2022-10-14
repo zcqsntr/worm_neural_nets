@@ -133,6 +133,7 @@ def evolve():
         save_path = os.path.join('working_dir', 'gen'+str(i))
         os.makedirs(save_path, exist_ok=True)
         plot_sol(sol.y, save_path=save_path)
+        plt.close('all')
 
         population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 7))*0.2 - 0.1
 
@@ -165,7 +166,7 @@ p = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0
 t_span = [0, 1200] #s
 
 y0 = [0, 0, 0, 0, 0, 0, 0, 0]
-sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,))
+#sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,))
 
 evolve()
 
