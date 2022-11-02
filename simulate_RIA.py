@@ -1,22 +1,20 @@
-from xdot import xdot, concentration_func
+from xdot import xdot, xdot_RIA, concentration_func
 from scipy.integrate import solve_ivp
 import numpy as np
 import matplotlib as mpl
 mpl.use('tkagg')
 import matplotlib.pyplot as plt
 import os
-import time
 
 def plot_sol(solution, save_path = None):
-
-
-
     #plot neuron voltages
+
     plt.figure()
     plt.plot(solution[0, :], label = 'AWC')
     plt.plot(solution[3, :], label = 'AIB')
     plt.plot(solution[4, :], label = 'AIA')
     plt.plot(solution[5, :], label = 'AIY')
+    plt.plot(solution[6, :], label = 'RAI')
     plt.legend()
 
     if save_path is not None:
@@ -34,32 +32,25 @@ def plot_sol(solution, save_path = None):
 
 
     # plot worm position
-    fig, ax = plt.subplots(figsize = [6.4,6.4])
+    fig, ax = plt.subplots()
 
-    # plate outline
-    circle = plt.Circle([0,0], plate_r, fill=False)
-    ax.add_patch(circle)
-
-    # scoring sectors
     pos = [-origin, origin]
-    rad = [2.5, 3.5]
+    rad = [2.5/3, 2.5/3*2, 2.5/3*3]
 
     for p in pos:
         for r in rad:
-            circle = plt.Circle(p, r, fill=False, color='gray')
+            circle = plt.Circle(p, r, fill=False)
             ax.add_patch(circle)
 
-    ax.vlines(0, domain[0], domain[1], color='grey')
-
-    ax.plot(solution[6,:], solution[7,:])
-    ax.scatter(solution[6,0], solution[7,0], label = 'start')
-    ax.scatter(solution[6,-1], solution[7,-1], label = 'end')
+    ax.plot(solution[7,:], solution[8,:])
+    ax.scatter(solution[7,0], solution[8,0], label = 'start')
+    ax.scatter(solution[7,-1], solution[8,-1], label = 'end')
 
 
     plt.xlim(domain[0], domain[1])
     plt.ylim(domain[0], domain[1])
 
-    plt.legend(loc = 'lower left')
+    plt.legend()
 
     if save_path is not None:
         plt.savefig(os.path.join(save_path, 'worm.pdf'))
@@ -78,7 +69,7 @@ def plot_conc(domain):
 
 
 def score_worm(solution):
-    trajectory = solution[6:8, :]
+    trajectory = solution[7:9, :]
     x = trajectory[0, :]
     y = trajectory[1, :]
     delx = origin[0] - x
@@ -92,19 +83,17 @@ def score_worm(solution):
 
     mirror_origin_dist = np.sqrt(delx ** 2 + dely ** 2)
 
+
+
     score = 0
-    score += -3*np.any(mirror_origin_dist < 2.5)
-    score += -2*np.any(mirror_origin_dist < 3.5)
-
-    score += 3 * np.any(origin_dist < 2.5)
-    score += 2 * np.any(origin_dist < 3.5)
-
-    score += -1 * np.any(x < 0)
-    score += 1 * np.any(x > 0)
+    score += -3*np.any(mirror_origin_dist < 2.5 / 3)
+    score += -2*np.any(mirror_origin_dist < 2.5 / 3 * 2)
+    score += -1*np.any(mirror_origin_dist < 2.5 / 3 * 3)
+    score += 3 * np.any(origin_dist < 2.5 / 3)
+    score += 2 * np.any(origin_dist < 2.5 / 3 * 2)
+    score += 1 * np.any(origin_dist < 2.5 / 3 * 3)
 
     return score
-
-
 
 
 def get_scores(population):
@@ -157,18 +146,17 @@ def evolve():
 def forward_euler(y0, params, dt, tmax):
 
     y = y0
-    all_ys = [y0]
-    for t in np.arange(0, tmax+dt, dt):
-        y = y + np.array(xdot(t, y, params))*dt
-        all_ys.append(y)
-    return np.array(all_ys).T
+
+    for i in range(0, tmax+dt, dt):
+        y =
+
 
 n_gens = 100
 pop_size = 100
-origin = np.array([4.5, 0.])
+origin = np.array([2.5, 0.])
 # starting params from gosh et al
 tm = 0.5 #s
-AIB_v0 = AIA_v0 = AIY_v0 = AWC_v0 = 0
+AIB_v0 = AIA_v0 = AIY_v0 = AWC_v0 = RIA_v0 = 0
 AWC_gain = 2
 AWC_f_a = 4 #1/s
 AWC_f_b = 15 #1/s
@@ -176,28 +164,21 @@ AWC_s_gamma = 2 #1/s
 speed = 0.11 #mm/s
 
 domain = [-3,3]
-plate_r = 3
-w_2 = w_3 = w_4 = w_5 = -2 # -ve weights
+
+w_2 = w_3 = w_4 = w_5 = w_8 = -2 # -ve weights
 w_1 = w_6 = w_7 = 2 # +ve weights
 
-sample_time = 0.01
-parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0,
-         speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, sample_time]
-
-
-
+p = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0, RIA_v0,speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8]
 t_span = [0, 1200] #s
 
-y0 = [0, 0, 0, 0, 0, 0, 0, 0]
-#sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
-dt = 0.0001 #from paper
-t = time.time()
-sol = forward_euler(y0, parameters, 0.01, t_span[-1])
-print(time.time()-t)
+
+
+y0 = [0, 0, 0, 0, 0, 0, 0, 0,0]
+sol = solve_ivp(xdot_RIA, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,))
+
 #evolve()
 
-print(score_worm(sol))
-
-plot_sol(sol)
-plot_conc(domain)
+print(score_worm(sol.y))
+#plot_conc(domain)
+plot_sol(sol.y)
 plt.show()
