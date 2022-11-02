@@ -197,10 +197,10 @@ def run_experiment(params, n_worms):
         last_sample = 0
 
 
-        if params[-1] < 0.1:
-            dt = params[-1]
-        else:
-            dt = 0.1
+
+        #dt = params[-1]
+
+
         sol = forward_euler(y0, params, dt, t_span[-1])
 
         sector = score_worm(sol)
@@ -223,12 +223,13 @@ def get_fitnesses(population):
 
     parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7]
-
+    all_sectors = []
     for p in population:
 
         params = parameters + list(p)
 
         sectors = run_experiment(params, n_worms)
+        all_sectors.append(sectors)
         mean_score = np.mean(list(map(sum, sectors)))
         std_score = np.std(list(map(sum, sectors)))
         mean_range = np.mean(list(map(lambda x: max(x) - min(x), sectors)))
@@ -237,8 +238,9 @@ def get_fitnesses(population):
         fitness = - (abs(mean_score-ms) + abs(mean_range-mr) + abs(std_score-ss) + abs(std_range-sr))
 
         fitnesses.append(fitness)
+        print(p, fitness)
 
-    return fitnesses
+    return fitnesses, all_sectors
 
 
 def evolve():
@@ -269,6 +271,22 @@ def evolve():
         print('max: ', np.max(fitnesses), population[0])
         print('mean: ', np.mean(fitnesses))
 
+def param_scan(start, stop, step, save_path = './working_dir/param_scan', plot=True):
+    os.makedirs(save_path, exist_ok = True)
+    population = np.arange(start, stop, step).reshape(-1, 1)
+
+    fitnesses, all_sectors = get_fitnesses(population)
+
+    if plot:
+        plt.plot(population, fitnesses)
+
+
+    np.save(save_path + '/params.npy',population)
+    np.save(save_path + '/fitnesses.npy',fitnesses)
+    np.save(save_path + '/sectors.npy',all_sectors)
+    if plot:
+        plt.show()
+
 
 def forward_euler(y0, params, dt, tmax):
 
@@ -280,11 +298,11 @@ def forward_euler(y0, params, dt, tmax):
         all_ys.append(y)
     return np.array(all_ys).T
 
-no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('/Users/neythen/Desktop/Projects/worm_neural_networks/data/behaviourdatabysector_NT.csv')
+no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
 
 n_gens = 100
 pop_size = 100
-n_worms = 10 # number of worms in each experiment
+n_worms = 100 # number of worms in each experiment
 
 origin = np.array([4.5, 0.])
 # starting params from gosh et al
@@ -311,7 +329,7 @@ t_span = [0, 1200] #s
 
 y0 = [0, 0, 0, 0, 0, 0, 0, 0]
 #sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
-dt = 0.1
+dt = 0.01
 
 
 plt.violinplot(list(map(sum, no_cond_no_odour)))
@@ -333,4 +351,4 @@ print('score', np.mean(list(map(sum, no_cond_no_odour))), 'score std', np.std(li
 
 plt.close('all')
 #plt.show()
-evolve()
+param_scan(0.01, 0.151, 0.01)
