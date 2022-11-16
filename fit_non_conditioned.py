@@ -257,14 +257,13 @@ def get_fitnesses(population):
     return fitnesses, all_sectors
 
 
-def evolve():
+def evolve_constraints():
 
     pos = np.random.random(size = (pop_size, 4))*10 # population of positive weights
     neg = np.random.random(size = (pop_size, 5))*-10  # population of negative weights
 
     population = np.hstack((pos, neg))
 
-    print(population.shape)
 
     for i in range(n_gens):
         fitnesses = get_fitnesses(population)
@@ -272,7 +271,7 @@ def evolve():
         order = np.argsort(fitnesses)[::-1]
 
         fitnesses = np.array(fitnesses)[order]
-        print(fitnesses)
+
         population = population[order]
 
         sol = solve_ivp(xdot, t_span, y0, t_eval=np.arange(t_span[-1]), args=(parameters[:-1] + list(population[0]),))
@@ -282,12 +281,44 @@ def evolve():
 
         population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
         population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), :4] < 0] = 0
-        population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), 4:] > 0] = 0
+        population[int(pop_size*0.4): int(pop_size*0.8), 4:][population[int(pop_size*0.4): int(pop_size*0.8), 4:] > 0] = 0
 
 
         population[int(pop_size*0.8): , :4] = np.random.random(size = (pop_size-int(pop_size*0.8), 4))*10
         population[int(pop_size*0.8): , 4:] = np.random.random(size = (pop_size-int(pop_size*0.8), 5))*-10
 
+
+
+        print('max: ', np.max(fitnesses), population[0])
+        print('mean: ', np.mean(fitnesses))
+
+
+def evolve():
+
+
+
+    population = np.random.random(size = (pop_size, 9))*20 - 10
+
+
+
+    for i in range(n_gens):
+        fitnesses = get_fitnesses(population)
+
+        order = np.argsort(fitnesses)[::-1]
+
+        fitnesses = np.array(fitnesses)[order]
+
+        population = population[order]
+
+        sol = solve_ivp(xdot, t_span, y0, t_eval=np.arange(t_span[-1]), args=(parameters[:-1] + list(population[0]),))
+        save_path = os.path.join('working_dir', 'gen'+str(i))
+        os.makedirs(save_path, exist_ok=True)
+        plot_sol(sol.y, save_path=save_path)
+
+        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
+
+
+        population[int(pop_size*0.8):] = np.random.random(size = (pop_size-int(pop_size*0.8), 9))*20-10
 
 
         print('max: ', np.max(fitnesses), population[0])
@@ -314,6 +345,7 @@ def param_scan(start, stop, step, save_path = './working_dir/param_scan', plot=T
 
 
 def forward_euler(y0, params, dt, tmax):
+    AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = params
 
     y = y0
     all_ys = [y0]
@@ -365,7 +397,7 @@ plt.violinplot(list(map(sum, no_cond_odour)))
 plt.figure()
 plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_odour)))
 print(len(no_cond_odour))
-print(no_cond_odour)
+
 print('score', np.mean(list(map(sum, no_cond_odour))), 'score std', np.std(list(map(sum, no_cond_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_odour))))
 
 
