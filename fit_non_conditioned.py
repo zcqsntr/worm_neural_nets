@@ -27,7 +27,7 @@ def concentration_func(x,y,t):
 
     std = 4
 
-    return gaussian(dist, mu=0, sig=std)*100*0
+    return gaussian(dist, mu=0, sig=std)*100
 
 
 def xdot(t, X, p):
@@ -38,7 +38,7 @@ def xdot(t, X, p):
 
     AWC_v, AWC_f, AWC_s, AIB_v, AIA_v, AIY_v, x, y = X
 
-    AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, sampling_time = p
+    AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = p
 
     conc = concentration_func(x, y, t)
 
@@ -59,15 +59,7 @@ def xdot(t, X, p):
 
     #go_forward = (np.random.random()*2 - 1) < AIY_v
 
-    turn = False
-
-    if t - last_sample >= sampling_time:
-        last_sample = t
-
-        #turn = (np.random.random() * 2 - 1) < AIB_v
-        #go_forward = (np.random.random() * 2 - 1) < AIY_v
-
-        turn = (np.random.random() * 4 - 2) < (AIB_v - AIY_v)
+    turn = (np.random.random() * 2 - 1) < np.tanh(w_8*AIB_v + w_9*AIY_v) # dt = sample_time so just make this decision every time
 
     if turn:
         theta = np.random.random() * 2 * np.pi
@@ -75,10 +67,12 @@ def xdot(t, X, p):
     dx = speed * np.cos(theta)
     dy = speed * np.sin(theta)
 
-    # stop worms going off the plate
+    # stop worms going off the plate by choosing another random direction, this stops them getting stuck on the edge
     x, y = X[6], X[7]
-    if abs((x+dx)**2 + (y+dy)**2)**0.5 > plate_r:
-        dx = dy = 0
+    while abs((x+dx)**2 + (y+dy)**2)**0.5 > plate_r:
+        theta = np.random.random() * 2 * np.pi
+        dx = speed * np.cos(theta)
+        dy = speed * np.sin(theta)
 
 
 
@@ -195,10 +189,11 @@ def run_experiment(params, n_worms):
     global last_sample
 
     sectors = []
-    dt = params[-1]
 
-    params[-1] = 0.000001
+
+
     for i in range(n_worms):
+
         theta = np.random.random() * 2 * np.pi
         last_sample = 0
 
@@ -207,6 +202,7 @@ def run_experiment(params, n_worms):
         sector = score_worm(sol)
 
         sectors.append(sector)
+
 
     return sectors
 
@@ -223,16 +219,31 @@ def get_fitnesses(population):
     fitnesses = []
 
     parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-         speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7]
+         speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
     all_sectors = []
+
 
     for p in population:
 
-        params = parameters + list(p)
+        params = parameters
 
-        sectors= run_experiment(params, n_worms)
+        # positive weights
+        params[10] = p[0]
+        params[15] = p[1]
+        params[16] = p[2]
+        params[17] = p[3]
+
+        # negative weights
+        params[11] = p[4]
+        params[12] = p[5]
+        params[13] = p[6]
+        params[14] = p[7]
+        params[18] = p[8]
+
+        sectors = run_experiment(params, n_worms)
 
         all_sectors.append(sectors)
+
         mean_score = np.mean(list(map(sum, sectors)))
         std_score = np.std(list(map(sum, sectors)))
         mean_range = np.mean(list(map(lambda x: max(x) - min(x), sectors)))
@@ -248,8 +259,12 @@ def get_fitnesses(population):
 
 def evolve():
 
-    population = np.random.random(size = (pop_size, 1))*10 + 0.05 # population of sampling times
+    pos = np.random.random(size = (pop_size, 4))*10 # population of positive weights
+    neg = np.random.random(size = (pop_size, 5))*-10  # population of negative weights
 
+    population = np.hstack((pos, neg))
+
+    print(population.shape)
 
     for i in range(n_gens):
         fitnesses = get_fitnesses(population)
@@ -265,11 +280,15 @@ def evolve():
         os.makedirs(save_path, exist_ok=True)
         plot_sol(sol.y, save_path=save_path)
 
-        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 1))*2 - 1.
+        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
+        population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), :4] < 0] = 0
+        population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), 4:] > 0] = 0
 
-        population[int(pop_size*0.8):] = np.random.random(size = (pop_size-int(pop_size*0.8), 1))*10 + 0.05
 
-        population[population < 0.05] = 0.05
+        population[int(pop_size*0.8): , :4] = np.random.random(size = (pop_size-int(pop_size*0.8), 4))*10
+        population[int(pop_size*0.8): , 4:] = np.random.random(size = (pop_size-int(pop_size*0.8), 5))*-10
+
+
 
         print('max: ', np.max(fitnesses), population[0])
         print('mean: ', np.mean(fitnesses))
@@ -309,7 +328,7 @@ no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/b
 
 n_gens = 100
 pop_size = 100
-n_worms = 100 # number of worms in each experiment
+n_worms = 70 # number of worms in each experiment
 
 origin = np.array([4.5, 0.])
 # starting params from gosh et al
@@ -323,12 +342,15 @@ speed = 0.11 #mm/s
 
 domain = [-3,3]
 plate_r = 3
-w_2 = w_3 = w_4 = w_5 = -2 # -ve weights
+w_2 = w_3 = w_4 = w_5  = -2 # -ve weights
 w_1 = w_6 = w_7 = 2 # +ve weights
+w_8 = 0.5
+w_9 = -0.5
 
 sample_time = 0.1 #s
+dt = 0.1
 parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0,
-         speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, sample_time]
+         speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
 
 
 
@@ -336,27 +358,23 @@ t_span = [0, 1200] #s
 
 y0 = [0, 0, 0, 0, 0, 0, 0, 0]
 #sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
-dt = 0.1
 
 
 
-plt.violinplot(list(map(sum, no_cond_no_odour)))
+plt.violinplot(list(map(sum, no_cond_odour)))
 plt.figure()
-plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
-print(len(no_cond_no_odour))
-print(no_cond_no_odour)
-print('score', np.mean(list(map(sum, no_cond_no_odour))), 'score std', np.std(list(map(sum, no_cond_no_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_no_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_no_odour))))
+plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_odour)))
+print(len(no_cond_odour))
+print(no_cond_odour)
+print('score', np.mean(list(map(sum, no_cond_odour))), 'score std', np.std(list(map(sum, no_cond_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_odour))))
 
 
-no_cond_no_odour = run_experiment(parameters, 35)
-print(no_cond_no_odour)
-plt.figure()
-plt.violinplot(list(map(sum, no_cond_no_odour)))
-plt.figure()
-plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
-print(len(no_cond_no_odour))
-print('score', np.mean(list(map(sum, no_cond_no_odour))), 'score std', np.std(list(map(sum, no_cond_no_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_no_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_no_odour))))
+sol = forward_euler(y0, parameters, dt, t_span[-1])
 
-#plt.close('all')
+evolve()
+
+print(score_worm(sol))
+
+plot_sol(sol)
+plot_conc(domain)
 plt.show()
-param_scan(0.06, 0.121, 0.01)

@@ -20,7 +20,7 @@ def concentration_func(x,y,t):
 
     std = 4
 
-    return gaussian(dist, mu=0, sig=std)*100*0
+    return gaussian(dist, mu=0, sig=std)*100
 
 
 def xdot(t, X, p):
