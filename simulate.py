@@ -155,10 +155,11 @@ def evolve():
 
 
 def forward_euler(y0, params, dt, tmax):
-
+    print('dt', dt)
     y = y0
     all_ys = [y0]
     for t in np.arange(0, tmax+dt, dt):
+
         y = y + np.array(xdot(t, y, params))*dt
         all_ys.append(y)
     return np.array(all_ys).T
@@ -180,7 +181,7 @@ plate_r = 3
 w_2 = w_3 = w_4 = w_5 = -2 # -ve weights
 w_1 = w_6 = w_7 = 2 # +ve weights
 
-sample_time = 0.01
+sample_time = 0.07
 parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0,
          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, sample_time]
 
@@ -192,7 +193,7 @@ y0 = [0, 0, 0, 0, 0, 0, 0, 0]
 #sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
 dt = 0.0001 #from paper
 t = time.time()
-sol = forward_euler(y0, parameters, 0.01, t_span[-1])
+sol = forward_euler(y0, parameters, 0.07, t_span[-1])
 print(time.time()-t)
 #evolve()
 

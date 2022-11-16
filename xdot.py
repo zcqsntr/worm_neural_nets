@@ -27,6 +27,8 @@ def xdot(t, X, p):
     global theta
     global last_sample
     global go_forward
+
+
     plate_r = 3
 
     AWC_v, AWC_f, AWC_s, AIB_v, AIA_v, AIY_v, x, y = X

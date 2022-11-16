@@ -43,9 +43,11 @@ for d in [no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour]:
     plt.violinplot(list(map(sum, d)))
     
 '''
+
+
 if __name__ == '__main__':
     no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data(
-        '/Users/neythen/Desktop/Projects/worm_neural_networks/data/behaviourdatabysector_NT.csv')
+        './data/behaviourdatabysector_NT.csv')
     plt.violinplot(list(map(sum, no_cond_no_odour)))
     plt.figure()
     plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))

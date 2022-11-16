@@ -63,6 +63,7 @@ def xdot(t, X, p):
 
     if t - last_sample >= sampling_time:
         last_sample = t
+
         #turn = (np.random.random() * 2 - 1) < AIB_v
         #go_forward = (np.random.random() * 2 - 1) < AIY_v
 
@@ -78,6 +79,8 @@ def xdot(t, X, p):
     x, y = X[6], X[7]
     if abs((x+dx)**2 + (y+dy)**2)**0.5 > plate_r:
         dx = dy = 0
+
+
 
     return dAWC_v, dAWC_f, dAWC_s, dAIB_v, dAIA_v, dAIY_v, dx, dy
 
@@ -192,14 +195,12 @@ def run_experiment(params, n_worms):
     global last_sample
 
     sectors = []
+    dt = params[-1]
+
+    params[-1] = 0.000001
     for i in range(n_worms):
         theta = np.random.random() * 2 * np.pi
         last_sample = 0
-
-
-
-        #dt = params[-1]
-
 
         sol = forward_euler(y0, params, dt, t_span[-1])
 
@@ -224,11 +225,13 @@ def get_fitnesses(population):
     parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7]
     all_sectors = []
+
     for p in population:
 
         params = parameters + list(p)
 
-        sectors = run_experiment(params, n_worms)
+        sectors= run_experiment(params, n_worms)
+
         all_sectors.append(sectors)
         mean_score = np.mean(list(map(sum, sectors)))
         std_score = np.std(list(map(sum, sectors)))
@@ -275,7 +278,9 @@ def param_scan(start, stop, step, save_path = './working_dir/param_scan', plot=T
     os.makedirs(save_path, exist_ok = True)
     population = np.arange(start, stop, step).reshape(-1, 1)
 
-    fitnesses, all_sectors = get_fitnesses(population)
+    fitnesses, all_sectors  = get_fitnesses(population)
+
+
 
     if plot:
         plt.plot(population, fitnesses)
@@ -283,7 +288,8 @@ def param_scan(start, stop, step, save_path = './working_dir/param_scan', plot=T
 
     np.save(save_path + '/params.npy',population)
     np.save(save_path + '/fitnesses.npy',fitnesses)
-    np.save(save_path + '/sectors.npy',all_sectors)
+    np.save(save_path + '/sectors.npy', all_sectors)
+
     if plot:
         plt.show()
 
@@ -296,6 +302,7 @@ def forward_euler(y0, params, dt, tmax):
     for t in np.arange(0, tmax+dt, dt):
         y = y + np.array(xdot(t, y, params))*dt
         all_ys.append(y)
+
     return np.array(all_ys).T
 
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
@@ -319,7 +326,7 @@ plate_r = 3
 w_2 = w_3 = w_4 = w_5 = -2 # -ve weights
 w_1 = w_6 = w_7 = 2 # +ve weights
 
-sample_time = 0.05 #s
+sample_time = 0.1 #s
 parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0,
          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, sample_time]
 
@@ -329,9 +336,10 @@ t_span = [0, 1200] #s
 
 y0 = [0, 0, 0, 0, 0, 0, 0, 0]
 #sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
-dt = 0.01
+dt = 0.1
 
 
+no_cond_no_odour.extend(no_cond_no_odour)
 plt.violinplot(list(map(sum, no_cond_no_odour)))
 plt.figure()
 plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
@@ -340,7 +348,7 @@ print(no_cond_no_odour)
 print('score', np.mean(list(map(sum, no_cond_no_odour))), 'score std', np.std(list(map(sum, no_cond_no_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_no_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_no_odour))))
 
 
-#no_cond_no_odour = run_experiment(parameters, 40)
+no_cond_no_odour = run_experiment(parameters, 35)
 print(no_cond_no_odour)
 plt.figure()
 plt.violinplot(list(map(sum, no_cond_no_odour)))
@@ -349,6 +357,6 @@ plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
 print(len(no_cond_no_odour))
 print('score', np.mean(list(map(sum, no_cond_no_odour))), 'score std', np.std(list(map(sum, no_cond_no_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_no_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_no_odour))))
 
-plt.close('all')
-#plt.show()
-param_scan(0.01, 0.151, 0.01)
+#plt.close('all')
+plt.show()
+param_scan(0.06, 0.121, 0.01)
