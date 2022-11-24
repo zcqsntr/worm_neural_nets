@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import os
 import time
 from load_data import load_data
+from multiprocessing import Pool
+import multiprocessing as mp
 
 theta = np.random.random() * 2 * np.pi
 last_sample = 0
@@ -206,58 +208,73 @@ def run_experiment(params, n_worms):
 
     return sectors
 
+def get_fitness(p):
 
+    ms = np.mean(list(map(sum, no_cond_odour)))
+    ss = np.std(list(map(sum, no_cond_odour)))
+    mr = np.mean(list(map(lambda x: max(x) - min(x), no_cond_odour)))
+    sr = np.std(list(map(lambda x: max(x) - min(x), no_cond_odour)))
+
+
+    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
+                  speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
+
+    # positive weights
+    params[10] = p[0]
+    params[15] = p[1]
+    params[16] = p[2]
+    params[17] = p[3]
+
+    # negative weights
+    params[11] = p[4]
+    params[12] = p[5]
+    params[13] = p[6]
+    params[14] = p[7]
+    params[18] = p[8]
+
+    sectors = run_experiment(params, n_worms)
+
+
+
+    mean_score = np.mean(list(map(sum, sectors)))
+    std_score = np.std(list(map(sum, sectors)))
+    mean_range = np.mean(list(map(lambda x: max(x) - min(x), sectors)))
+    std_range = np.std(list(map(lambda x: max(x) - min(x), sectors)))
+
+    fitness = - (abs(mean_score - ms) + abs(mean_range - mr) + abs(std_score - ss) + abs(std_range - sr))
+
+    return fitness
 
 def get_fitnesses(population):
 
-    # values form the no cond no odor data
-    ms = np.mean(list(map(sum, no_cond_no_odour)))
-    ss = np.std(list(map(sum, no_cond_no_odour)))
-    mr = np.mean(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
-    sr = np.std(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
-
+    # values form the no cond no odor dat
     fitnesses = []
-
-    parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-         speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
-    all_sectors = []
 
 
     for p in population:
-
-        params = parameters
-
-        # positive weights
-        params[10] = p[0]
-        params[15] = p[1]
-        params[16] = p[2]
-        params[17] = p[3]
-
-        # negative weights
-        params[11] = p[4]
-        params[12] = p[5]
-        params[13] = p[6]
-        params[14] = p[7]
-        params[18] = p[8]
-
-        sectors = run_experiment(params, n_worms)
-
-        all_sectors.append(sectors)
-
-        mean_score = np.mean(list(map(sum, sectors)))
-        std_score = np.std(list(map(sum, sectors)))
-        mean_range = np.mean(list(map(lambda x: max(x) - min(x), sectors)))
-        std_range = np.std(list(map(lambda x: max(x) - min(x), sectors)))
-
-        fitness = - (abs(mean_score-ms) + abs(mean_range-mr) + abs(std_score-ss) + abs(std_range-sr))
-
+        fitness = get_fitness(p)
+        '''
+        print('score', abs(mean_score),  'score std',abs(std_score), 'range', abs(mean_range), 'range std', abs(std_range))
+        print('score error', abs(mean_score-ms),'score std error', abs(std_score-ss),  'range error', abs(mean_range-mr), 'range std error', abs(std_range-sr))
+        print('score error', ms,'score std error', ss,  'range error', mr, 'range std error',sr)
+        print()
+        '''
         fitnesses.append(fitness)
-        print(p, fitness)
-
-    return fitnesses, all_sectors
 
 
-def evolve_constraints():
+    return fitnesses
+
+
+def get_fitnesses_par(population):
+    n_cores = int(mp.cpu_count())
+
+    with Pool(n_cores) as pool:
+        fitnesses = pool.map(get_fitness, population)
+
+    return fitnesses
+
+
+def evolve_constraints(save_path = './working_dir/evolution_constrained'):
 
     pos = np.random.random(size = (pop_size, 4))*10 # population of positive weights
     neg = np.random.random(size = (pop_size, 5))*-10  # population of negative weights
@@ -266,7 +283,14 @@ def evolve_constraints():
 
 
     for i in range(n_gens):
-        fitnesses = get_fitnesses(population)
+
+        fitnesses = get_fitnesses_par(population)
+
+        save_p = os.path.join(save_path, 'gen' + str(i))
+        os.makedirs(save_p, exist_ok=True)
+
+        np.save(save_p + '/population.npy', population)
+        np.save(save_p + '/fitnesses.npy', fitnesses)
 
         order = np.argsort(fitnesses)[::-1]
 
@@ -274,10 +298,6 @@ def evolve_constraints():
 
         population = population[order]
 
-        sol = solve_ivp(xdot, t_span, y0, t_eval=np.arange(t_span[-1]), args=(parameters[:-1] + list(population[0]),))
-        save_path = os.path.join('working_dir', 'gen'+str(i))
-        os.makedirs(save_path, exist_ok=True)
-        plot_sol(sol.y, save_path=save_path)
 
         population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
         population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), :4] < 0] = 0
@@ -293,7 +313,7 @@ def evolve_constraints():
         print('mean: ', np.mean(fitnesses))
 
 
-def evolve():
+def evolve(save_path = './working_dir/evolution'):
 
 
 
@@ -302,18 +322,19 @@ def evolve():
 
 
     for i in range(n_gens):
+        save_p = os.path.join(save_path, 'gen' + str(i))
+        os.makedirs(save_p, exist_ok=True)
         fitnesses = get_fitnesses(population)
+        np.save(save_p + '/population.npy', population)
+        np.save(save_p + '/fitnesses.npy', fitnesses)
+
+
 
         order = np.argsort(fitnesses)[::-1]
 
         fitnesses = np.array(fitnesses)[order]
 
         population = population[order]
-
-        sol = solve_ivp(xdot, t_span, y0, t_eval=np.arange(t_span[-1]), args=(parameters[:-1] + list(population[0]),))
-        save_path = os.path.join('working_dir', 'gen'+str(i))
-        os.makedirs(save_path, exist_ok=True)
-        plot_sol(sol.y, save_path=save_path)
 
         population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
 
@@ -347,6 +368,7 @@ def param_scan(start, stop, step, save_path = './working_dir/param_scan', plot=T
 def forward_euler(y0, params, dt, tmax):
     AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = params
 
+
     y = y0
     all_ys = [y0]
 
@@ -358,7 +380,7 @@ def forward_euler(y0, params, dt, tmax):
 
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
 
-n_gens = 100
+n_gens = 1000
 pop_size = 100
 n_worms = 70 # number of worms in each experiment
 
@@ -381,7 +403,7 @@ w_9 = -0.5
 
 sample_time = 0.1 #s
 dt = 0.1
-parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0,
+params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0,
          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
 
 
@@ -401,12 +423,43 @@ print(len(no_cond_odour))
 print('score', np.mean(list(map(sum, no_cond_odour))), 'score std', np.std(list(map(sum, no_cond_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_odour))))
 
 
-sol = forward_euler(y0, parameters, dt, t_span[-1])
+opt = 'E'
+#sol = forward_euler(y0, parameters, dt, t_span[-1])
 
-evolve()
 
-print(score_worm(sol))
+#evolve_constraints()
 
-plot_sol(sol)
-plot_conc(domain)
-plt.show()
+#print(score_worm(sol))
+
+# test the population from the evo algorithm with lots of worms to reduce noise effects
+if opt == 'E':
+    evolve_constraints()
+elif opt == 'P':
+    population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/population.npy')
+    fitnesses = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/fitnesses.npy')
+
+    order = np.argsort(fitnesses)[::-1]
+    population = population[order]
+
+    get_fitnesses(population[0:5])
+
+    plt.show()
+
+else:
+    n_worms = 1000
+
+    population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/gen63/population.npy')
+    fitnesses = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/gen63/fitnesses.npy')
+    order = np.argsort(fitnesses)[::-1]
+    print(order)
+
+    t = time.time()
+    fitnesses = get_fitnesses(population)
+    print(time.time() - t)
+    order = np.argsort(fitnesses)[::-1]
+    print(order)
+
+    np.save('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/' + 'population.npy', population)
+    np.save('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/' + 'fitnesses.npy', fitnesses)
+
+
