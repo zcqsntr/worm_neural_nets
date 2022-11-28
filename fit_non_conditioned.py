@@ -9,6 +9,8 @@ import time
 from load_data import load_data
 from multiprocessing import Pool
 import multiprocessing as mp
+from scipy import stats
+
 
 theta = np.random.random() * 2 * np.pi
 last_sample = 0
@@ -212,8 +214,11 @@ def get_fitness(p):
 
     ms = np.mean(list(map(sum, no_cond_odour)))
     ss = np.std(list(map(sum, no_cond_odour)))
+    sks = stats.skew(list(map(sum, no_cond_odour)))
+
     mr = np.mean(list(map(lambda x: max(x) - min(x), no_cond_odour)))
     sr = np.std(list(map(lambda x: max(x) - min(x), no_cond_odour)))
+    skr = stats.skew(list(map(lambda x: max(x) - min(x), no_cond_odour)))
 
 
     params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
@@ -238,10 +243,13 @@ def get_fitness(p):
 
     mean_score = np.mean(list(map(sum, sectors)))
     std_score = np.std(list(map(sum, sectors)))
+    skew_score = stats.skew(list(map(sum, sectors)))
     mean_range = np.mean(list(map(lambda x: max(x) - min(x), sectors)))
     std_range = np.std(list(map(lambda x: max(x) - min(x), sectors)))
+    skew_range = stats.skew(list(map(lambda x: max(x) - min(x), sectors)))
 
-    fitness = - (abs(mean_score - ms) + abs(mean_range - mr) + abs(std_score - ss) + abs(std_range - sr))
+
+    fitness = - (abs(mean_score - ms) + abs(mean_range - mr) + abs(std_score - ss) + abs(std_range - sr) + abs(skew_score - sks) + abs(skew_range - skr))
 
     return fitness
 
@@ -272,6 +280,34 @@ def get_fitnesses_par(population):
         fitnesses = pool.map(get_fitness, population)
 
     return fitnesses
+
+def run_experiment_wrapper(p):
+    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
+              speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
+
+    # positive weights
+    params[10] = p[0]
+    params[15] = p[1]
+    params[16] = p[2]
+    params[17] = p[3]
+
+    # negative weights
+    params[11] = p[4]
+    params[12] = p[5]
+    params[13] = p[6]
+    params[14] = p[7]
+    params[18] = p[8]
+
+    sectors = run_experiment(params, n_worms)
+    return sectors
+
+def run_experiment_par(population):
+    n_cores = int(mp.cpu_count())
+
+    with Pool(n_cores) as pool:
+        sectors = pool.map(run_experiment_wrapper, population)
+
+    return sectors
 
 
 def evolve_constraints(save_path = './working_dir/evolution_constrained'):
@@ -415,15 +451,8 @@ y0 = [0, 0, 0, 0, 0, 0, 0, 0]
 
 
 
-plt.violinplot(list(map(sum, no_cond_odour)))
-plt.figure()
-plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_odour)))
-print(len(no_cond_odour))
 
-print('score', np.mean(list(map(sum, no_cond_odour))), 'score std', np.std(list(map(sum, no_cond_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_odour))))
-
-
-opt = 'E'
+opt = 'T'
 #sol = forward_euler(y0, parameters, dt, t_span[-1])
 
 
@@ -431,35 +460,82 @@ opt = 'E'
 
 #print(score_worm(sol))
 
-# test the population from the evo algorithm with lots of worms to reduce noise effects
+
+
+
 if opt == 'E':
     evolve_constraints()
 elif opt == 'P':
-    population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/population.npy')
-    fitnesses = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/fitnesses.npy')
+    population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/221123_fit_constrained/population.npy')
+    fitnesses = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/221123_fit_constrained/fitnesses.npy')
 
     order = np.argsort(fitnesses)[::-1]
     population = population[order]
 
-    get_fitnesses(population[0:5])
+    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
+              speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
+
+    all_sectors = []
+
+
+
+    all_sectors = run_experiment_par(population[0:25])
+
+    ncols = 5
+    fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
+
+
+    ms_errors = []
+    ss_errors = []
+    mr_errors = []
+    sr_errors = []
+
+    for i, sectors in enumerate(all_sectors):
+
+        ax = axs[i // ncols, i  % ncols]
+        ax.violinplot([sum(s) for s in sectors])
+
+        ax.set_ylim(bottom=-6.1, top=6.1)
+
+        ax.violinplot(list(map(sum, no_cond_odour)))
+        ax.violinplot(list(map(sum, sectors)))
+
+
+
+    fig.suptitle('Violin plots of top 25 members of the evolutionary population')
+    plt.savefig('violin_plots.png', dpi=300)
+
+
+
+
+
+
+    print('score', np.mean(list(map(sum, no_cond_odour))), 'score std', np.std(list(map(sum, no_cond_odour))), 'range',
+          np.mean(list(map(lambda x: max(x) - min(x), no_cond_odour))), 'range std',
+          np.std(list(map(lambda x: max(x) - min(x), no_cond_odour))))
+
+
+    print('score', np.mean(list(map(sum, sectors))), 'score std', np.std(list(map(sum, sectors))), 'range',
+          np.mean(list(map(lambda x: max(x) - min(x), sectors))), 'range std',
+          np.std(list(map(lambda x: max(x) - min(x), sectors))))
 
     plt.show()
 
-else:
+elif opt == 'T':
     n_worms = 1000
-
-    population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/gen63/population.npy')
-    fitnesses = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/gen63/fitnesses.npy')
+    path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/gen501/'
+    population = np.load(path + 'population.npy')
+    fitnesses = np.load(path + 'fitnesses.npy')
     order = np.argsort(fitnesses)[::-1]
     print(order)
 
     t = time.time()
-    fitnesses = get_fitnesses(population)
+    fitnesses = get_fitnesses_par(population)
     print(time.time() - t)
     order = np.argsort(fitnesses)[::-1]
     print(order)
 
-    np.save('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/' + 'population.npy', population)
-    np.save('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/181122_fit_unconditioned_constrained/' + 'fitnesses.npy', fitnesses)
+    np.save('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/' + 'population.npy', population)
+    np.save('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/' + 'fitnesses.npy', fitnesses)
 
 
