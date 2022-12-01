@@ -195,9 +195,9 @@ def run_experiment(params, n_worms):
     global last_sample
 
     sectors = []
-    dt = params[-1]
 
-    params[-1] = 0.000001
+
+
     for i in range(n_worms):
         theta = np.random.random() * 2 * np.pi
         last_sample = 0
@@ -326,7 +326,7 @@ plate_r = 3
 w_2 = w_3 = w_4 = w_5 = -2 # -ve weights
 w_1 = w_6 = w_7 = 2 # +ve weights
 
-sample_time = 0.1 #s
+sample_time = 0.01 #s
 parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0,
          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, sample_time]
 
@@ -340,9 +340,12 @@ dt = 0.1
 
 
 
+
 plt.violinplot(list(map(sum, no_cond_no_odour)))
+plt.ylim(bottom=-6.1, top=6.1)
 plt.figure()
 plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
+
 print(len(no_cond_no_odour))
 print(no_cond_no_odour)
 print('score', np.mean(list(map(sum, no_cond_no_odour))), 'score std', np.std(list(map(sum, no_cond_no_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_no_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_no_odour))))
@@ -352,11 +355,13 @@ no_cond_no_odour = run_experiment(parameters, 35)
 print(no_cond_no_odour)
 plt.figure()
 plt.violinplot(list(map(sum, no_cond_no_odour)))
+plt.ylim(bottom=-6.1, top=6.1)
 plt.figure()
 plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
 print(len(no_cond_no_odour))
 print('score', np.mean(list(map(sum, no_cond_no_odour))), 'score std', np.std(list(map(sum, no_cond_no_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_no_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_no_odour))))
 
-#plt.close('all')
 plt.show()
-param_scan(0.06, 0.121, 0.01)
+#plt.close('all')
+
+#param_scan(0.06, 0.121, 0.01)

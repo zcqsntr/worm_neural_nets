@@ -10,6 +10,8 @@ from load_data import load_data
 from multiprocessing import Pool
 import multiprocessing as mp
 from scipy import stats
+import matplotlib.cm as cm
+import matplotlib.animation as animation
 
 
 theta = np.random.random() * 2 * np.pi
@@ -17,7 +19,7 @@ last_sample = 0
 
 
 def gaussian(x, mu, sig):
-    return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
+    return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))*0
 
 
 def concentration_func(x,y,t):
@@ -83,37 +85,31 @@ def xdot(t, X, p):
     return dAWC_v, dAWC_f, dAWC_s, dAIB_v, dAIA_v, dAIY_v, dx, dy
 
 def plot_sol(solution, save_path = None):
+    fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(25, 7.5))
 
-
+    # plot sensory neuron components
+    axs[0].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt), solution[1, :], label='AWC fast')
+    axs[0].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt), solution[2, :], label='AWC slow')
+    axs[0].legend()
+    axs[0].set_xlabel('Time (s)')
+    axs[0].set_ylabel('Sensory neuron voltage')
 
     #plot neuron voltages
-    plt.figure()
-    plt.plot(solution[0, :], label = 'AWC')
-    plt.plot(solution[3, :], label = 'AIB')
-    plt.plot(solution[4, :], label = 'AIA')
-    plt.plot(solution[5, :], label = 'AIY')
-    plt.legend()
-
-    if save_path is not None:
-        plt.savefig(os.path.join(save_path, 'voltages.pdf'))
-
-    #plot sensory neuron components
-
-    plt.figure()
-    plt.plot(solution[1,:], label = 'AWC fast')
-    plt.plot(solution[2,:], label = 'AWC slow')
-    plt.legend()
-
-    if save_path is not None:
-        plt.savefig(os.path.join(save_path, 'sensory.pdf'))
+    axs[1].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt),solution[0, :], label = 'AWC')
+    axs[1].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt),solution[3, :], label = 'AIB')
+    axs[1].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt),solution[4, :], label = 'AIA')
+    axs[1].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt),solution[5, :], label = 'AIY')
+    axs[1].legend()
+    axs[1].set_xlabel('Time (s)')
+    axs[1].set_ylabel('Neuron voltages')
 
 
     # plot worm position
-    fig, ax = plt.subplots(figsize = [6.4,6.4])
+
 
     # plate outline
     circle = plt.Circle([0,0], plate_r, fill=False)
-    ax.add_patch(circle)
+    axs[2].add_patch(circle)
 
     # scoring sectors
     pos = [-origin, origin]
@@ -122,19 +118,19 @@ def plot_sol(solution, save_path = None):
     for p in pos:
         for r in rad:
             circle = plt.Circle(p, r, fill=False, color='gray')
-            ax.add_patch(circle)
+            axs[2].add_patch(circle)
 
-    ax.vlines(0, domain[0], domain[1], color='grey')
+    axs[2].vlines(0, domain[0], domain[1], color='grey')
 
-    ax.plot(solution[6,:], solution[7,:])
-    ax.scatter(solution[6,0], solution[7,0], label = 'start')
-    ax.scatter(solution[6,-1], solution[7,-1], label = 'end')
+    axs[2].plot(solution[6,:], solution[7,:])
+    axs[2].scatter(solution[6,0], solution[7,0], label = 'start')
+    axs[2].scatter(solution[6,-1], solution[7,-1], label = 'end')
 
 
-    plt.xlim(domain[0], domain[1])
-    plt.ylim(domain[0], domain[1])
+    axs[2].set_xlim(domain[0], domain[1])
+    axs[2].set_ylim(domain[0], domain[1])
 
-    plt.legend(loc = 'lower left')
+    axs[2].legend(loc = 'lower left')
 
     if save_path is not None:
         plt.savefig(os.path.join(save_path, 'worm.pdf'))
@@ -452,7 +448,7 @@ y0 = [0, 0, 0, 0, 0, 0, 0, 0]
 
 
 
-opt = 'T'
+opt = 'S'
 #sol = forward_euler(y0, parameters, dt, t_span[-1])
 
 
@@ -466,8 +462,8 @@ opt = 'T'
 if opt == 'E':
     evolve_constraints()
 elif opt == 'P':
-    population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/221123_fit_constrained/population.npy')
-    fitnesses = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/221123_fit_constrained/fitnesses.npy')
+    population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/population.npy')
+    fitnesses = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/fitnesses.npy')
 
     order = np.argsort(fitnesses)[::-1]
     population = population[order]
@@ -538,4 +534,36 @@ elif opt == 'T':
     np.save('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/' + 'population.npy', population)
     np.save('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/' + 'fitnesses.npy', fitnesses)
 
+elif opt == 'S':
+    population = np.load(
+        '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/population.npy')
+    p = population[0]
 
+    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
+              speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
+
+    # positive weights
+    params[10] = p[0]
+    params[15] = p[1]
+    params[16] = p[2]
+    params[17] = p[3]
+
+    # negative weights
+    params[11] = p[4]
+    params[12] = p[5]
+    params[13] = p[6]
+    params[14] = p[7]
+    params[18] = p[8]
+
+    sol = forward_euler(y0, params, dt, t_span[-1])
+
+
+
+
+
+
+    print(score_worm(sol))
+
+    plot_sol(sol)
+    plot_conc(domain)
+    plt.show()

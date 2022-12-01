@@ -181,6 +181,9 @@ plate_r = 3
 w_2 = w_3 = w_4 = w_5 = -2 # -ve weights
 w_1 = w_6 = w_7 = 2 # +ve weights
 
+weights = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/population.npy')[0]
+
+
 sample_time = 0.000001
 parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0,
          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, sample_time]
