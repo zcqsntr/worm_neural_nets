@@ -18,15 +18,16 @@ import matplotlib.animation as animation
 
 
 class WormSimulator():
-    def __init__(self, dt, t_span=[0,1200], y0=[0, 0, 0, 0, 0, 0, 0, 0]):
+    def __init__(self, dataset, dt, t_span=[0,1200], y0=[0, 0, 0, 0, 0, 0, 0, 0]):
         self.params =[4, 15, 2, 0.5, 0, 2, 0, 0, 0, 0.11, 2, -2, -2, -2, -2, 2, 2, 0.5, -0.5] # [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
         self.dt = dt
         self.t_span = t_span  # s
         self.y0 = y0
         self.theta = np.random.random() * 2 * np.pi
+        self.dataset = dataset
 
     def gaussian(self, x, mu, sig):
-        return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))*0
+        return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
 
     def concentration_func(self, x,y,t):
 
@@ -80,8 +81,8 @@ class WormSimulator():
         x, y = X[6], X[7]
         while abs((x+dx)**2 + (y+dy)**2)**0.5 > plate_r:
             self.theta = np.random.random() * 2 * np.pi
-            dx = speed * np.cos(theta)
-            dy = speed * np.sin(theta)
+            dx = speed * np.cos(self.theta)
+            dy = speed * np.sin(self.theta)
 
 
 
@@ -211,13 +212,13 @@ class WormSimulator():
 
     def get_fitness(self, weights):
 
-        ms = np.mean(list(map(sum, no_cond_odour)))
-        ss = np.std(list(map(sum, no_cond_odour)))
-        sks = stats.skew(list(map(sum, no_cond_odour)))
+        ms = np.mean(list(map(sum, self.dataset)))
+        ss = np.std(list(map(sum, self.dataset)))
+        sks = stats.skew(list(map(sum, self.dataset)))
 
-        mr = np.mean(list(map(lambda x: max(x) - min(x), no_cond_odour)))
-        sr = np.std(list(map(lambda x: max(x) - min(x), no_cond_odour)))
-        skr = stats.skew(list(map(lambda x: max(x) - min(x), no_cond_odour)))
+        mr = np.mean(list(map(lambda x: max(x) - min(x), self.dataset)))
+        sr = np.std(list(map(lambda x: max(x) - min(x), self.dataset)))
+        skr = stats.skew(list(map(lambda x: max(x) - min(x), self.dataset)))
 
 
         params = self.params
@@ -308,77 +309,6 @@ class WormSimulator():
         return sectors
 
 
-    def evolve_constraints(self, save_path = './working_dir/evolution_constrained'):
-
-        pos = np.random.random(size = (pop_size, 4))*10 # population of positive weights
-        neg = np.random.random(size = (pop_size, 5))*-10  # population of negative weights
-
-        population = np.hstack((pos, neg))
-
-
-        for i in range(n_gens):
-
-            fitnesses = self.get_fitnesses_par(population)
-
-            save_p = os.path.join(save_path, 'gen' + str(i))
-            os.makedirs(save_p, exist_ok=True)
-
-            np.save(save_p + '/population.npy', population)
-            np.save(save_p + '/fitnesses.npy', fitnesses)
-
-            order = np.argsort(fitnesses)[::-1]
-
-            fitnesses = np.array(fitnesses)[order]
-
-            population = population[order]
-
-
-            population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
-            population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), :4] < 0] = 0
-            population[int(pop_size*0.4): int(pop_size*0.8), 4:][population[int(pop_size*0.4): int(pop_size*0.8), 4:] > 0] = 0
-
-
-            population[int(pop_size*0.8): , :4] = np.random.random(size = (pop_size-int(pop_size*0.8), 4))*10
-            population[int(pop_size*0.8): , 4:] = np.random.random(size = (pop_size-int(pop_size*0.8), 5))*-10
-
-
-
-            print('max: ', np.max(fitnesses), population[0])
-            print('mean: ', np.mean(fitnesses))
-
-
-    def evolve(self, save_path = './working_dir/evolution'):
-
-
-
-        population = np.random.random(size = (pop_size, 9))*20 - 10
-
-
-
-        for i in range(n_gens):
-            save_p = os.path.join(save_path, 'gen' + str(i))
-            os.makedirs(save_p, exist_ok=True)
-            fitnesses = self.get_fitnesses(population)
-            np.save(save_p + '/population.npy', population)
-            np.save(save_p + '/fitnesses.npy', fitnesses)
-
-
-
-            order = np.argsort(fitnesses)[::-1]
-
-            fitnesses = np.array(fitnesses)[order]
-
-            population = population[order]
-
-            population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
-
-
-            population[int(pop_size*0.8):] = np.random.random(size = (pop_size-int(pop_size*0.8), 9))*20-10
-
-
-            print('max: ', np.max(fitnesses), population[0])
-            print('mean: ', np.mean(fitnesses))
-
     def param_scan(self, start, stop, step, save_path = './working_dir/param_scan', plot=True):
         os.makedirs(save_path, exist_ok = True)
         population = np.arange(start, stop, step).reshape(-1, 1)
@@ -413,6 +343,39 @@ class WormSimulator():
         return np.array(all_ys).T
 
 
+def evolve(simulator, n_gens, pop_size, save_path = './working_dir/evolution'):
+
+
+
+    population = np.random.random(size = (pop_size, 9))*20 - 10
+
+
+
+    for i in range(n_gens):
+        save_p = os.path.join(save_path, 'gen' + str(i))
+        os.makedirs(save_p, exist_ok=True)
+        fitnesses = simulator.get_fitnesses(population)
+        np.save(save_p + '/population.npy', population)
+        np.save(save_p + '/fitnesses.npy', fitnesses)
+
+
+
+        order = np.argsort(fitnesses)[::-1]
+
+        fitnesses = np.array(fitnesses)[order]
+
+        population = population[order]
+
+        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
+
+
+        population[int(pop_size*0.8):] = np.random.random(size = (pop_size-int(pop_size*0.8), 9))*20-10
+
+
+        print('max: ', np.max(fitnesses), population[0])
+        print('mean: ', np.mean(fitnesses))
+
+
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
 
 n_gens = 1000
@@ -436,7 +399,7 @@ w_1 = w_6 = w_7 = 2 # +ve weights
 w_8 = 0.5
 w_9 = -0.5
 
-simulator = WormSimulator(dt = 0.1)
+simulator = WormSimulator(dataset = no_cond_no_odour, dt = 0.1)
 
 
 
@@ -446,7 +409,7 @@ simulator = WormSimulator(dt = 0.1)
 
 
 
-opt = 'S'
+opt = 'P'
 #sol = forward_euler(y0, parameters, dt, t_span[-1])
 
 
@@ -458,7 +421,7 @@ opt = 'S'
 
 
 if opt == 'E':
-    simulator.evolve_constraints()
+    evolve(simulator, n_gens, pop_size)
 elif opt == 'P':
     population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/population.npy')
     fitnesses = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/fitnesses.npy')
@@ -553,12 +516,7 @@ elif opt == 'S':
     params[14] = p[7]
     params[18] = p[8]
 
-    sol = simulator.forward_euler(y0, params, dt, t_span[-1])
-
-
-
-
-
+    sol = simulator.forward_euler(simulator.y0, params, simulator.dt, simulator.t_span[-1])
 
     print(simulator.score_worm(sol))
 
