@@ -14,401 +14,404 @@ import matplotlib.cm as cm
 import matplotlib.animation as animation
 
 
-theta = np.random.random() * 2 * np.pi
-last_sample = 0
 
 
-def gaussian(x, mu, sig):
-    return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))*0
 
+class WormSimulator():
+    def __init__(self, dt, t_span=[0,1200], y0=[0, 0, 0, 0, 0, 0, 0, 0]):
+        self.params =[4, 15, 2, 0.5, 0, 2, 0, 0, 0, 0.11, 2, -2, -2, -2, -2, 2, 2, 0.5, -0.5] # [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
+        self.dt = dt
+        self.t_span = t_span  # s
+        self.y0 = y0
+        self.theta = np.random.random() * 2 * np.pi
 
-def concentration_func(x,y,t):
+    def gaussian(self, x, mu, sig):
+        return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))*0
 
-    origin = np.array([4.5, 0.])
+    def concentration_func(self, x,y,t):
 
-    delx = origin[0] - x
-    dely = origin[1] - y
+        origin = np.array([4.5, 0.])
 
-    dist = np.sqrt(delx**2 + dely**2)
+        delx = origin[0] - x
+        dely = origin[1] - y
 
-    std = 4
+        dist = np.sqrt(delx**2 + dely**2)
 
-    return gaussian(dist, mu=0, sig=std)*100
+        std = 4
 
+        return self.gaussian(dist, mu=0, sig=std)*100
 
-def xdot(t, X, p):
-    global theta
-    global last_sample
-    global go_forward
-    plate_r = 3
+    def xdot(self, t, X, p):
 
-    AWC_v, AWC_f, AWC_s, AIB_v, AIA_v, AIY_v, x, y = X
+        plate_r = 3
 
-    AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = p
+        AWC_v, AWC_f, AWC_s, AIB_v, AIA_v, AIY_v, x, y = X
 
-    conc = concentration_func(x, y, t)
+        AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = p
 
-    dAWC_f = AWC_f_a*conc - AWC_f_b*AWC_f
-    dAWC_s = AWC_s_gamma*(AWC_f - AWC_s)
-    AWC_i = AWC_f-AWC_s
-    dAWC_v = 1/tm *(-AWC_v + AWC_v0 + np.tanh(-AWC_gain*AWC_i)) # -ve in tanh because downstep in conc activates AWC
+        conc = self.concentration_func(x, y, t)
 
-    AIB_i = w_1*AWC_v + w_4*AIA_v
-    dAIB_v = 1/tm *(-AIB_v + AIB_v0 + np.tanh(AIB_i)) # removed gains as redundant with the weights
+        dAWC_f = AWC_f_a*conc - AWC_f_b*AWC_f
+        dAWC_s = AWC_s_gamma*(AWC_f - AWC_s)
+        AWC_i = AWC_f-AWC_s
+        dAWC_v = 1/tm *(-AWC_v + AWC_v0 + np.tanh(-AWC_gain*AWC_i)) # -ve in tanh because downstep in conc activates AWC
 
+        AIB_i = w_1*AWC_v + w_4*AIA_v
+        dAIB_v = 1/tm *(-AIB_v + AIB_v0 + np.tanh(AIB_i)) # removed gains as redundant with the weights
 
-    AIA_i = w_2 * AWC_v + w_5*AIB_v + w_6*AIY_v
-    dAIA_v = 1 / tm * (-AIA_v + AIA_v0 + np.tanh(AIA_i))
 
-    AIY_i = w_3 * AWC_v + w_7 * AIA_v
-    dAIY_v = 1 / tm * (-AIY_v + AIY_v0 + np.tanh(AIY_i))
+        AIA_i = w_2 * AWC_v + w_5*AIB_v + w_6*AIY_v
+        dAIA_v = 1 / tm * (-AIA_v + AIA_v0 + np.tanh(AIA_i))
 
-    #go_forward = (np.random.random()*2 - 1) < AIY_v
+        AIY_i = w_3 * AWC_v + w_7 * AIA_v
+        dAIY_v = 1 / tm * (-AIY_v + AIY_v0 + np.tanh(AIY_i))
 
-    turn = (np.random.random() * 2 - 1) < np.tanh(w_8*AIB_v + w_9*AIY_v) # dt = sample_time so just make this decision every time
+        #go_forward = (np.random.random()*2 - 1) < AIY_v
 
-    if turn:
-        theta = np.random.random() * 2 * np.pi
+        turn = (np.random.random() * 2 - 1) < np.tanh(w_8*AIB_v + w_9*AIY_v) # dt = sample_time so just make this decision every time
 
-    dx = speed * np.cos(theta)
-    dy = speed * np.sin(theta)
+        if turn:
+            self.theta = np.random.random() * 2 * np.pi
 
-    # stop worms going off the plate by choosing another random direction, this stops them getting stuck on the edge
-    x, y = X[6], X[7]
-    while abs((x+dx)**2 + (y+dy)**2)**0.5 > plate_r:
-        theta = np.random.random() * 2 * np.pi
-        dx = speed * np.cos(theta)
-        dy = speed * np.sin(theta)
+        dx = speed * np.cos(self.theta)
+        dy = speed * np.sin(self.theta)
 
+        # stop worms going off the plate by choosing another random direction, this stops them getting stuck on the edge
+        x, y = X[6], X[7]
+        while abs((x+dx)**2 + (y+dy)**2)**0.5 > plate_r:
+            self.theta = np.random.random() * 2 * np.pi
+            dx = speed * np.cos(theta)
+            dy = speed * np.sin(theta)
 
 
-    return dAWC_v, dAWC_f, dAWC_s, dAIB_v, dAIA_v, dAIY_v, dx, dy
 
-def plot_sol(solution, save_path = None):
-    fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(25, 7.5))
+        return dAWC_v, dAWC_f, dAWC_s, dAIB_v, dAIA_v, dAIY_v, dx, dy
 
-    # plot sensory neuron components
-    axs[0].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt), solution[1, :], label='AWC fast')
-    axs[0].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt), solution[2, :], label='AWC slow')
-    axs[0].legend()
-    axs[0].set_xlabel('Time (s)')
-    axs[0].set_ylabel('Sensory neuron voltage')
+    def plot_sol(self, solution, save_path = None):
+        fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(25, 7.5))
 
-    #plot neuron voltages
-    axs[1].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt),solution[0, :], label = 'AWC')
-    axs[1].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt),solution[3, :], label = 'AIB')
-    axs[1].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt),solution[4, :], label = 'AIA')
-    axs[1].plot(np.arange(t_span[0], t_span[1] + 2*dt, dt),solution[5, :], label = 'AIY')
-    axs[1].legend()
-    axs[1].set_xlabel('Time (s)')
-    axs[1].set_ylabel('Neuron voltages')
+        # plot sensory neuron components
+        axs[0].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt), solution[1, :], label='AWC fast')
+        axs[0].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt), solution[2, :], label='AWC slow')
+        axs[0].legend()
+        axs[0].set_xlabel('Time (s)')
+        axs[0].set_ylabel('Sensory neuron voltage')
 
+        #plot neuron voltages
+        axs[1].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt),solution[0, :], label = 'AWC')
+        axs[1].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt),solution[3, :], label = 'AIB')
+        axs[1].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt),solution[4, :], label = 'AIA')
+        axs[1].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt),solution[5, :], label = 'AIY')
+        axs[1].legend()
+        axs[1].set_xlabel('Time (s)')
+        axs[1].set_ylabel('Neuron voltages')
 
-    # plot worm position
 
+        # plot worm position
 
-    # plate outline
-    circle = plt.Circle([0,0], plate_r, fill=False)
-    axs[2].add_patch(circle)
 
-    # scoring sectors
-    pos = [-origin, origin]
-    rad = [2.5, 3.5]
+        # plate outline
+        circle = plt.Circle([0,0], plate_r, fill=False)
+        axs[2].add_patch(circle)
 
-    for p in pos:
-        for r in rad:
-            circle = plt.Circle(p, r, fill=False, color='gray')
-            axs[2].add_patch(circle)
+        # scoring sectors
+        pos = [-origin, origin]
+        rad = [2.5, 3.5]
 
-    axs[2].vlines(0, domain[0], domain[1], color='grey')
+        for p in pos:
+            for r in rad:
+                circle = plt.Circle(p, r, fill=False, color='gray')
+                axs[2].add_patch(circle)
 
-    axs[2].plot(solution[6,:], solution[7,:])
-    axs[2].scatter(solution[6,0], solution[7,0], label = 'start')
-    axs[2].scatter(solution[6,-1], solution[7,-1], label = 'end')
+        axs[2].vlines(0, domain[0], domain[1], color='grey')
 
+        axs[2].plot(solution[6,:], solution[7,:])
+        axs[2].scatter(solution[6,0], solution[7,0], label = 'start')
+        axs[2].scatter(solution[6,-1], solution[7,-1], label = 'end')
 
-    axs[2].set_xlim(domain[0], domain[1])
-    axs[2].set_ylim(domain[0], domain[1])
 
-    axs[2].legend(loc = 'lower left')
+        axs[2].set_xlim(domain[0], domain[1])
+        axs[2].set_ylim(domain[0], domain[1])
 
-    if save_path is not None:
-        plt.savefig(os.path.join(save_path, 'worm.pdf'))
+        axs[2].legend(loc = 'lower left')
 
+        if save_path is not None:
+            plt.savefig(os.path.join(save_path, 'worm.pdf'))
 
-def plot_conc(domain):
-    plt.figure()
-    x = np.arange(domain[0], domain[1], 0.001)
-    y = np.arange(domain[0], domain[1], 0.001)
-    X, Y = np.meshgrid(x, y)
 
-    img = concentration_func(X,Y,0)
+    def plot_conc(self, domain):
+        plt.figure()
+        x = np.arange(domain[0], domain[1], 0.001)
+        y = np.arange(domain[0], domain[1], 0.001)
+        X, Y = np.meshgrid(x, y)
 
-    plt.imshow(img, extent=[domain[0], domain[1], domain[1], domain[0]])
-    plt.colorbar()
+        img = self.concentration_func(X,Y,0)
 
+        plt.imshow(img, extent=[domain[0], domain[1], domain[1], domain[0]])
+        plt.colorbar()
 
-def score_worm(solution):
-    trajectory = solution[6:8, :]
-    x = trajectory[0, :]
-    y = trajectory[1, :]
-    delx = origin[0] - x
-    dely = origin[1] - y
 
-    origin_dist = np.sqrt(delx ** 2 + dely ** 2)
+    def score_worm(self, solution):
+        trajectory = solution[6:8, :]
+        x = trajectory[0, :]
+        y = trajectory[1, :]
+        delx = origin[0] - x
+        dely = origin[1] - y
 
-    mirror_origin = -origin
-    delx = mirror_origin[0] - x
-    dely = mirror_origin[1] - y
+        origin_dist = np.sqrt(delx ** 2 + dely ** 2)
 
-    mirror_origin_dist = np.sqrt(delx ** 2 + dely ** 2)
+        mirror_origin = -origin
+        delx = mirror_origin[0] - x
+        dely = mirror_origin[1] - y
 
-    sectors = []
+        mirror_origin_dist = np.sqrt(delx ** 2 + dely ** 2)
 
-    if np.any(mirror_origin_dist < 2.5):
-        sectors.append(-3)
-    if np.any(mirror_origin_dist < 3.5):
-        sectors.append(-2)
+        sectors = []
 
-    if np.any(origin_dist < 2.5):
-        sectors.append(3)
+        if np.any(mirror_origin_dist < 2.5):
+            sectors.append(-3)
+        if np.any(mirror_origin_dist < 3.5):
+            sectors.append(-2)
 
-    if np.any(origin_dist < 3.5):
-        sectors.append(2)
+        if np.any(origin_dist < 2.5):
+            sectors.append(3)
 
-    if np.any(x < 0):
-        sectors.append(-1)
-    if np.any(x > 0):
-        sectors.append(1)
+        if np.any(origin_dist < 3.5):
+            sectors.append(2)
 
-    return sectors
+        if np.any(x < 0):
+            sectors.append(-1)
+        if np.any(x > 0):
+            sectors.append(1)
 
+        return sectors
 
-def run_experiment(params, n_worms):
-    global theta
-    global last_sample
 
-    sectors = []
+    def run_experiment(self, params, n_worms):
 
 
 
-    for i in range(n_worms):
+        sectors = []
 
-        theta = np.random.random() * 2 * np.pi
-        last_sample = 0
 
-        sol = forward_euler(y0, params, dt, t_span[-1])
 
-        sector = score_worm(sol)
+        for i in range(n_worms):
 
-        sectors.append(sector)
+            theta = np.random.random() * 2 * np.pi
+            last_sample = 0
 
+            sol = self.forward_euler(self.y0, params, self.dt, self.t_span[-1])
 
-    return sectors
+            sector = self.score_worm(sol)
 
-def get_fitness(p):
+            sectors.append(sector)
 
-    ms = np.mean(list(map(sum, no_cond_odour)))
-    ss = np.std(list(map(sum, no_cond_odour)))
-    sks = stats.skew(list(map(sum, no_cond_odour)))
 
-    mr = np.mean(list(map(lambda x: max(x) - min(x), no_cond_odour)))
-    sr = np.std(list(map(lambda x: max(x) - min(x), no_cond_odour)))
-    skr = stats.skew(list(map(lambda x: max(x) - min(x), no_cond_odour)))
+        return sectors
 
+    def get_fitness(self, weights):
 
-    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
+        ms = np.mean(list(map(sum, no_cond_odour)))
+        ss = np.std(list(map(sum, no_cond_odour)))
+        sks = stats.skew(list(map(sum, no_cond_odour)))
+
+        mr = np.mean(list(map(lambda x: max(x) - min(x), no_cond_odour)))
+        sr = np.std(list(map(lambda x: max(x) - min(x), no_cond_odour)))
+        skr = stats.skew(list(map(lambda x: max(x) - min(x), no_cond_odour)))
+
+
+        params = self.params
+
+        # positive weights
+        params[10] = weights[0]
+        params[15] = weights[1]
+        params[16] = weights[2]
+        params[17] = weights[3]
+
+        # negative weights
+        params[11] = weights[4]
+        params[12] = weights[5]
+        params[13] = weights[6]
+        params[14] = weights[7]
+        params[18] = weights[8]
+
+        sectors = self.run_experiment(params, n_worms)
+
+
+
+        mean_score = np.mean(list(map(sum, sectors)))
+        std_score = np.std(list(map(sum, sectors)))
+        skew_score = stats.skew(list(map(sum, sectors)))
+        mean_range = np.mean(list(map(lambda x: max(x) - min(x), sectors)))
+        std_range = np.std(list(map(lambda x: max(x) - min(x), sectors)))
+        skew_range = stats.skew(list(map(lambda x: max(x) - min(x), sectors)))
+
+
+        fitness = - (abs(mean_score - ms) + abs(mean_range - mr) + abs(std_score - ss) + abs(std_range - sr) + abs(skew_score - sks) + abs(skew_range - skr))
+
+        return fitness
+
+    def get_fitnesses(self, population):
+
+        # values form the no cond no odor dat
+        fitnesses = []
+
+
+        for p in population:
+            fitness = self.get_fitness(p)
+            '''
+            print('score', abs(mean_score),  'score std',abs(std_score), 'range', abs(mean_range), 'range std', abs(std_range))
+            print('score error', abs(mean_score-ms),'score std error', abs(std_score-ss),  'range error', abs(mean_range-mr), 'range std error', abs(std_range-sr))
+            print('score error', ms,'score std error', ss,  'range error', mr, 'range std error',sr)
+            print()
+            '''
+            fitnesses.append(fitness)
+
+
+        return fitnesses
+
+
+    def get_fitnesses_par(self, population):
+        n_cores = int(mp.cpu_count())
+
+        with Pool(n_cores) as pool:
+            fitnesses = pool.map(self.get_fitness, population)
+
+        return fitnesses
+
+    def run_experiment_wrapper(self, p):
+        params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
                   speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
 
-    # positive weights
-    params[10] = p[0]
-    params[15] = p[1]
-    params[16] = p[2]
-    params[17] = p[3]
+        # positive weights
+        params[10] = p[0]
+        params[15] = p[1]
+        params[16] = p[2]
+        params[17] = p[3]
 
-    # negative weights
-    params[11] = p[4]
-    params[12] = p[5]
-    params[13] = p[6]
-    params[14] = p[7]
-    params[18] = p[8]
+        # negative weights
+        params[11] = p[4]
+        params[12] = p[5]
+        params[13] = p[6]
+        params[14] = p[7]
+        params[18] = p[8]
 
-    sectors = run_experiment(params, n_worms)
+        sectors = self.run_experiment(params, n_worms)
+        return sectors
 
+    def run_experiment_par(self, population):
+        n_cores = int(mp.cpu_count())
 
+        with Pool(n_cores) as pool:
+            sectors = pool.map(self.run_experiment_wrapper, population)
 
-    mean_score = np.mean(list(map(sum, sectors)))
-    std_score = np.std(list(map(sum, sectors)))
-    skew_score = stats.skew(list(map(sum, sectors)))
-    mean_range = np.mean(list(map(lambda x: max(x) - min(x), sectors)))
-    std_range = np.std(list(map(lambda x: max(x) - min(x), sectors)))
-    skew_range = stats.skew(list(map(lambda x: max(x) - min(x), sectors)))
+        return sectors
 
 
-    fitness = - (abs(mean_score - ms) + abs(mean_range - mr) + abs(std_score - ss) + abs(std_range - sr) + abs(skew_score - sks) + abs(skew_range - skr))
+    def evolve_constraints(self, save_path = './working_dir/evolution_constrained'):
 
-    return fitness
+        pos = np.random.random(size = (pop_size, 4))*10 # population of positive weights
+        neg = np.random.random(size = (pop_size, 5))*-10  # population of negative weights
 
-def get_fitnesses(population):
+        population = np.hstack((pos, neg))
 
-    # values form the no cond no odor dat
-    fitnesses = []
 
+        for i in range(n_gens):
 
-    for p in population:
-        fitness = get_fitness(p)
-        '''
-        print('score', abs(mean_score),  'score std',abs(std_score), 'range', abs(mean_range), 'range std', abs(std_range))
-        print('score error', abs(mean_score-ms),'score std error', abs(std_score-ss),  'range error', abs(mean_range-mr), 'range std error', abs(std_range-sr))
-        print('score error', ms,'score std error', ss,  'range error', mr, 'range std error',sr)
-        print()
-        '''
-        fitnesses.append(fitness)
+            fitnesses = self.get_fitnesses_par(population)
 
+            save_p = os.path.join(save_path, 'gen' + str(i))
+            os.makedirs(save_p, exist_ok=True)
 
-    return fitnesses
+            np.save(save_p + '/population.npy', population)
+            np.save(save_p + '/fitnesses.npy', fitnesses)
 
+            order = np.argsort(fitnesses)[::-1]
 
-def get_fitnesses_par(population):
-    n_cores = int(mp.cpu_count())
+            fitnesses = np.array(fitnesses)[order]
 
-    with Pool(n_cores) as pool:
-        fitnesses = pool.map(get_fitness, population)
+            population = population[order]
 
-    return fitnesses
 
-def run_experiment_wrapper(p):
-    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-              speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
+            population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
+            population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), :4] < 0] = 0
+            population[int(pop_size*0.4): int(pop_size*0.8), 4:][population[int(pop_size*0.4): int(pop_size*0.8), 4:] > 0] = 0
 
-    # positive weights
-    params[10] = p[0]
-    params[15] = p[1]
-    params[16] = p[2]
-    params[17] = p[3]
 
-    # negative weights
-    params[11] = p[4]
-    params[12] = p[5]
-    params[13] = p[6]
-    params[14] = p[7]
-    params[18] = p[8]
+            population[int(pop_size*0.8): , :4] = np.random.random(size = (pop_size-int(pop_size*0.8), 4))*10
+            population[int(pop_size*0.8): , 4:] = np.random.random(size = (pop_size-int(pop_size*0.8), 5))*-10
 
-    sectors = run_experiment(params, n_worms)
-    return sectors
 
-def run_experiment_par(population):
-    n_cores = int(mp.cpu_count())
 
-    with Pool(n_cores) as pool:
-        sectors = pool.map(run_experiment_wrapper, population)
+            print('max: ', np.max(fitnesses), population[0])
+            print('mean: ', np.mean(fitnesses))
 
-    return sectors
 
+    def evolve(self, save_path = './working_dir/evolution'):
 
-def evolve_constraints(save_path = './working_dir/evolution_constrained'):
 
-    pos = np.random.random(size = (pop_size, 4))*10 # population of positive weights
-    neg = np.random.random(size = (pop_size, 5))*-10  # population of negative weights
 
-    population = np.hstack((pos, neg))
+        population = np.random.random(size = (pop_size, 9))*20 - 10
 
 
-    for i in range(n_gens):
 
-        fitnesses = get_fitnesses_par(population)
+        for i in range(n_gens):
+            save_p = os.path.join(save_path, 'gen' + str(i))
+            os.makedirs(save_p, exist_ok=True)
+            fitnesses = self.get_fitnesses(population)
+            np.save(save_p + '/population.npy', population)
+            np.save(save_p + '/fitnesses.npy', fitnesses)
 
-        save_p = os.path.join(save_path, 'gen' + str(i))
-        os.makedirs(save_p, exist_ok=True)
 
-        np.save(save_p + '/population.npy', population)
-        np.save(save_p + '/fitnesses.npy', fitnesses)
 
-        order = np.argsort(fitnesses)[::-1]
+            order = np.argsort(fitnesses)[::-1]
 
-        fitnesses = np.array(fitnesses)[order]
+            fitnesses = np.array(fitnesses)[order]
 
-        population = population[order]
+            population = population[order]
 
+            population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
 
-        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
-        population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), :4] < 0] = 0
-        population[int(pop_size*0.4): int(pop_size*0.8), 4:][population[int(pop_size*0.4): int(pop_size*0.8), 4:] > 0] = 0
 
+            population[int(pop_size*0.8):] = np.random.random(size = (pop_size-int(pop_size*0.8), 9))*20-10
 
-        population[int(pop_size*0.8): , :4] = np.random.random(size = (pop_size-int(pop_size*0.8), 4))*10
-        population[int(pop_size*0.8): , 4:] = np.random.random(size = (pop_size-int(pop_size*0.8), 5))*-10
 
+            print('max: ', np.max(fitnesses), population[0])
+            print('mean: ', np.mean(fitnesses))
 
+    def param_scan(self, start, stop, step, save_path = './working_dir/param_scan', plot=True):
+        os.makedirs(save_path, exist_ok = True)
+        population = np.arange(start, stop, step).reshape(-1, 1)
 
-        print('max: ', np.max(fitnesses), population[0])
-        print('mean: ', np.mean(fitnesses))
+        fitnesses, all_sectors  = self.get_fitnesses(population)
 
 
-def evolve(save_path = './working_dir/evolution'):
 
+        if plot:
+            plt.plot(population, fitnesses)
 
 
-    population = np.random.random(size = (pop_size, 9))*20 - 10
+        np.save(save_path + '/params.npy',population)
+        np.save(save_path + '/fitnesses.npy',fitnesses)
+        np.save(save_path + '/sectors.npy', all_sectors)
 
+        if plot:
+            plt.show()
 
 
-    for i in range(n_gens):
-        save_p = os.path.join(save_path, 'gen' + str(i))
-        os.makedirs(save_p, exist_ok=True)
-        fitnesses = get_fitnesses(population)
-        np.save(save_p + '/population.npy', population)
-        np.save(save_p + '/fitnesses.npy', fitnesses)
+    def forward_euler(self, y0, params, dt, tmax):
+        AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = params
 
 
+        y = y0
+        all_ys = [y0]
 
-        order = np.argsort(fitnesses)[::-1]
+        for t in np.arange(0, tmax+dt, dt):
+            y = y + np.array(self.xdot(t, y, params))*dt
+            all_ys.append(y)
 
-        fitnesses = np.array(fitnesses)[order]
+        return np.array(all_ys).T
 
-        population = population[order]
-
-        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
-
-
-        population[int(pop_size*0.8):] = np.random.random(size = (pop_size-int(pop_size*0.8), 9))*20-10
-
-
-        print('max: ', np.max(fitnesses), population[0])
-        print('mean: ', np.mean(fitnesses))
-
-def param_scan(start, stop, step, save_path = './working_dir/param_scan', plot=True):
-    os.makedirs(save_path, exist_ok = True)
-    population = np.arange(start, stop, step).reshape(-1, 1)
-
-    fitnesses, all_sectors  = get_fitnesses(population)
-
-
-
-    if plot:
-        plt.plot(population, fitnesses)
-
-
-    np.save(save_path + '/params.npy',population)
-    np.save(save_path + '/fitnesses.npy',fitnesses)
-    np.save(save_path + '/sectors.npy', all_sectors)
-
-    if plot:
-        plt.show()
-
-
-def forward_euler(y0, params, dt, tmax):
-    AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = params
-
-
-    y = y0
-    all_ys = [y0]
-
-    for t in np.arange(0, tmax+dt, dt):
-        y = y + np.array(xdot(t, y, params))*dt
-        all_ys.append(y)
-
-    return np.array(all_ys).T
 
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
 
@@ -433,16 +436,11 @@ w_1 = w_6 = w_7 = 2 # +ve weights
 w_8 = 0.5
 w_9 = -0.5
 
-sample_time = 0.1 #s
-dt = 0.1
-params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0,
-         speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
+simulator = WormSimulator(dt = 0.1)
 
 
 
-t_span = [0, 1200] #s
 
-y0 = [0, 0, 0, 0, 0, 0, 0, 0]
 #sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
 
 
@@ -460,7 +458,7 @@ opt = 'S'
 
 
 if opt == 'E':
-    evolve_constraints()
+    simulator.evolve_constraints()
 elif opt == 'P':
     population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/population.npy')
     fitnesses = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/fitnesses.npy')
@@ -475,7 +473,7 @@ elif opt == 'P':
 
 
 
-    all_sectors = run_experiment_par(population[0:25])
+    all_sectors = simulator.run_experiment_par(population[0:25])
 
     ncols = 5
     fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
@@ -526,7 +524,7 @@ elif opt == 'T':
     print(order)
 
     t = time.time()
-    fitnesses = get_fitnesses_par(population)
+    fitnesses = simulator.get_fitnesses_par(population)
     print(time.time() - t)
     order = np.argsort(fitnesses)[::-1]
     print(order)
@@ -555,15 +553,15 @@ elif opt == 'S':
     params[14] = p[7]
     params[18] = p[8]
 
-    sol = forward_euler(y0, params, dt, t_span[-1])
+    sol = simulator.forward_euler(y0, params, dt, t_span[-1])
 
 
 
 
 
 
-    print(score_worm(sol))
+    print(simulator.score_worm(sol))
 
-    plot_sol(sol)
-    plot_conc(domain)
+    simulator.plot_sol(sol)
+    simulator.plot_conc(domain)
     plt.show()
