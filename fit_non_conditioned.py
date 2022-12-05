@@ -19,7 +19,7 @@ import matplotlib.animation as animation
 
 class WormSimulator():
     def __init__(self, dataset, dt, t_span=[0,1200], y0=[0, 0, 0, 0, 0, 0, 0, 0]):
-        self.params =[4, 15, 2, 0.5, 0, 2, 0, 0, 0, 0.11, 2, -2, -2, -2, -2, 2, 2, 0.5, -0.5] # [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
+        self.params =[4, 15, 2, 0.5, 0, 2, 0, 0, 0, 0.11, 2, -2, -2, -2, -2, 2, 2, 0.5, -0.5, False, None] # [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
         self.dt = dt
         self.t_span = t_span  # s
         self.y0 = y0
@@ -29,7 +29,7 @@ class WormSimulator():
     def gaussian(self, x, mu, sig):
         return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
 
-    def concentration_func(self, x,y,t):
+    def concentration_func(self, x,y,t, t_interval = None):
 
         origin = np.array([4.5, 0.])
 
@@ -39,8 +39,11 @@ class WormSimulator():
         dist = np.sqrt(delx**2 + dely**2)
 
         std = 4
+        if t_interval is None or t_interval[0] <= t <= t_interval[1]:
 
-        return self.gaussian(dist, mu=0, sig=std)*100
+            return self.gaussian(dist, mu=0, sig=std)*100
+        else:
+            return 0
 
     def xdot(self, t, X, p):
 
@@ -48,9 +51,9 @@ class WormSimulator():
 
         AWC_v, AWC_f, AWC_s, AIB_v, AIA_v, AIY_v, x, y = X
 
-        AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = p
+        AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval = p
 
-        conc = self.concentration_func(x, y, t)
+        conc = self.concentration_func(x, y, t, conc_interval)
 
         dAWC_f = AWC_f_a*conc - AWC_f_b*AWC_f
         dAWC_s = AWC_s_gamma*(AWC_f - AWC_s)
@@ -69,20 +72,24 @@ class WormSimulator():
 
         #go_forward = (np.random.random()*2 - 1) < AIY_v
 
-        turn = (np.random.random() * 2 - 1) < np.tanh(w_8*AIB_v + w_9*AIY_v) # dt = sample_time so just make this decision every time
+        if worm_trapped:
+            dy = dx = 0
+        else:
 
-        if turn:
-            self.theta = np.random.random() * 2 * np.pi
+            turn = (np.random.random() * 2 - 1) < np.tanh(w_8*AIB_v + w_9*AIY_v) # dt = sample_time so just make this decision every time
 
-        dx = speed * np.cos(self.theta)
-        dy = speed * np.sin(self.theta)
+            if turn:
+                self.theta = np.random.random() * 2 * np.pi
 
-        # stop worms going off the plate by choosing another random direction, this stops them getting stuck on the edge
-        x, y = X[6], X[7]
-        while abs((x+dx)**2 + (y+dy)**2)**0.5 > plate_r:
-            self.theta = np.random.random() * 2 * np.pi
             dx = speed * np.cos(self.theta)
             dy = speed * np.sin(self.theta)
+
+            # stop worms going off the plate by choosing another random direction, this stops them getting stuck on the edge
+            x, y = X[6], X[7]
+            while abs((x+dx)**2 + (y+dy)**2)**0.5 > plate_r:
+                self.theta = np.random.random() * 2 * np.pi
+                dx = speed * np.cos(self.theta)
+                dy = speed * np.sin(self.theta)
 
 
 
@@ -187,19 +194,13 @@ class WormSimulator():
 
         return sectors
 
-
     def run_experiment(self, params, n_worms):
-
-
-
         sectors = []
-
-
 
         for i in range(n_worms):
 
-            theta = np.random.random() * 2 * np.pi
-            last_sample = 0
+            self.theta = np.random.random() * 2 * np.pi
+            self.last_sample = 0
 
             sol = self.forward_euler(self.y0, params, self.dt, self.t_span[-1])
 
@@ -271,7 +272,6 @@ class WormSimulator():
 
         return fitnesses
 
-
     def get_fitnesses_par(self, population):
         n_cores = int(mp.cpu_count())
 
@@ -281,8 +281,7 @@ class WormSimulator():
         return fitnesses
 
     def run_experiment_wrapper(self, p):
-        params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-                  speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
+        params = self.params
 
         # positive weights
         params[10] = p[0]
@@ -308,29 +307,8 @@ class WormSimulator():
 
         return sectors
 
-
-    def param_scan(self, start, stop, step, save_path = './working_dir/param_scan', plot=True):
-        os.makedirs(save_path, exist_ok = True)
-        population = np.arange(start, stop, step).reshape(-1, 1)
-
-        fitnesses, all_sectors  = self.get_fitnesses(population)
-
-
-
-        if plot:
-            plt.plot(population, fitnesses)
-
-
-        np.save(save_path + '/params.npy',population)
-        np.save(save_path + '/fitnesses.npy',fitnesses)
-        np.save(save_path + '/sectors.npy', all_sectors)
-
-        if plot:
-            plt.show()
-
-
     def forward_euler(self, y0, params, dt, tmax):
-        AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = params
+
 
 
         y = y0
@@ -342,6 +320,25 @@ class WormSimulator():
 
         return np.array(all_ys).T
 
+
+def param_scan(simulator, start, stop, step, save_path = './working_dir/param_scan', plot=True):
+    os.makedirs(save_path, exist_ok = True)
+    population = np.arange(start, stop, step).reshape(-1, 1)
+
+    fitnesses, all_sectors  = simulator.get_fitnesses(population)
+
+
+
+    if plot:
+        plt.plot(population, fitnesses)
+
+
+    np.save(save_path + '/params.npy',population)
+    np.save(save_path + '/fitnesses.npy',fitnesses)
+    np.save(save_path + '/sectors.npy', all_sectors)
+
+    if plot:
+        plt.show()
 
 def evolve(simulator, n_gens, pop_size, save_path = './working_dir/evolution'):
 
@@ -370,6 +367,45 @@ def evolve(simulator, n_gens, pop_size, save_path = './working_dir/evolution'):
 
 
         population[int(pop_size*0.8):] = np.random.random(size = (pop_size-int(pop_size*0.8), 9))*20-10
+
+
+        print('max: ', np.max(fitnesses), population[0])
+        print('mean: ', np.mean(fitnesses))
+
+
+def evolve_constraints(simulator, save_path = './working_dir/evolution_constrained'):
+
+    pos = np.random.random(size = (pop_size, 4))*10 # population of positive weights
+    neg = np.random.random(size = (pop_size, 5))*-10  # population of negative weights
+
+    population = np.hstack((pos, neg))
+
+
+    for i in range(n_gens):
+
+        fitnesses = simulator.get_fitnesses_par(population)
+
+        save_p = os.path.join(save_path, 'gen' + str(i))
+        os.makedirs(save_p, exist_ok=True)
+
+        np.save(save_p + '/population.npy', population)
+        np.save(save_p + '/fitnesses.npy', fitnesses)
+
+        order = np.argsort(fitnesses)[::-1]
+
+        fitnesses = np.array(fitnesses)[order]
+
+        population = population[order]
+
+
+        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
+        population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), :4] < 0] = 0
+        population[int(pop_size*0.4): int(pop_size*0.8), 4:][population[int(pop_size*0.4): int(pop_size*0.8), 4:] > 0] = 0
+
+
+        population[int(pop_size*0.8): , :4] = np.random.random(size = (pop_size-int(pop_size*0.8), 4))*10
+        population[int(pop_size*0.8): , 4:] = np.random.random(size = (pop_size-int(pop_size*0.8), 5))*-10
+
 
 
         print('max: ', np.max(fitnesses), population[0])
@@ -409,7 +445,7 @@ simulator = WormSimulator(dataset = no_cond_no_odour, dt = 0.1)
 
 
 
-opt = 'P'
+opt = 'C'
 #sol = forward_euler(y0, parameters, dt, t_span[-1])
 
 
@@ -418,19 +454,22 @@ opt = 'P'
 #print(score_worm(sol))
 
 
+worm_trapped = False
+conc_interval = None
 
+params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
+          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
-if opt == 'E':
+if opt == 'E': # evolve
     evolve(simulator, n_gens, pop_size)
-elif opt == 'P':
+elif opt == 'P':  # plot
     population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/population.npy')
     fitnesses = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/fitnesses.npy')
 
     order = np.argsort(fitnesses)[::-1]
     population = population[order]
 
-    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-              speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
+
 
     all_sectors = []
 
@@ -478,7 +517,7 @@ elif opt == 'P':
 
     plt.show()
 
-elif opt == 'T':
+elif opt == 'T': # test
     n_worms = 1000
     path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/gen501/'
     population = np.load(path + 'population.npy')
@@ -495,13 +534,11 @@ elif opt == 'T':
     np.save('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/' + 'population.npy', population)
     np.save('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/' + 'fitnesses.npy', fitnesses)
 
-elif opt == 'S':
+elif opt == 'S': # simulate
     population = np.load(
         '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/population.npy')
     p = population[0]
 
-    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-              speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
 
     # positive weights
     params[10] = p[0]
@@ -517,6 +554,38 @@ elif opt == 'S':
     params[18] = p[8]
 
     sol = simulator.forward_euler(simulator.y0, params, simulator.dt, simulator.t_span[-1])
+
+    print(simulator.score_worm(sol))
+
+    simulator.plot_sol(sol)
+    simulator.plot_conc(domain)
+    plt.show()
+
+elif opt == 'C': # test worm in the calcium imaging experiment
+    worm_trapped = True
+    conc_interval = [10, 40]
+    max_t = 70
+    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
+              speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
+
+    population = np.load(
+        '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/281122_fit_constrained/population.npy')
+    p = population[0]
+
+    # positive weights
+    params[10] = p[0]
+    params[15] = p[1]
+    params[16] = p[2]
+    params[17] = p[3]
+
+    # negative weights
+    params[11] = p[4]
+    params[12] = p[5]
+    params[13] = p[6]
+    params[14] = p[7]
+    params[18] = p[8]
+
+    sol = simulator.forward_euler(simulator.y0, params, simulator.dt,max_t)
 
     print(simulator.score_worm(sol))
 

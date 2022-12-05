@@ -127,8 +127,6 @@ def get_scores(population):
 
 
 
-
-
 def evolve():
 
     population = np.random.random(size = (pop_size, 7))*20 - 10

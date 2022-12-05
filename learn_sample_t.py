@@ -305,7 +305,12 @@ def forward_euler(y0, params, dt, tmax):
 
     return np.array(all_ys).T
 
+
+
+
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
+
+
 
 n_gens = 100
 pop_size = 100
