@@ -307,15 +307,15 @@ class WormSimulator():
 
         return sectors
 
-    def forward_euler(self, y0, params, dt, tmax):
+    def forward_euler(self, y0, params):
 
 
 
         y = y0
         all_ys = [y0]
-
-        for t in np.arange(0, tmax+dt, dt):
-            y = y + np.array(self.xdot(t, y, params))*dt
+        tmax = self.t_span[-1]
+        for t in np.arange(0, tmax+self.dt, self.dt):
+            y = y + np.array(self.xdot(t, y, params))*self.dt
             all_ys.append(y)
 
         return np.array(all_ys).T
@@ -584,8 +584,8 @@ elif opt == 'C': # test worm in the calcium imaging experiment
     params[13] = p[6]
     params[14] = p[7]
     params[18] = p[8]
-
-    sol = simulator.forward_euler(simulator.y0, params, simulator.dt,max_t)
+    simulator.t_span[-1] = max_t
+    sol = simulator.forward_euler(simulator.y0, params)
 
     print(simulator.score_worm(sol))
 
