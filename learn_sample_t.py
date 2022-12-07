@@ -314,7 +314,7 @@ no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/b
 
 n_gens = 100
 pop_size = 100
-n_worms = 100 # number of worms in each experiment
+n_worms = 1000 # number of worms in each experiment
 
 origin = np.array([4.5, 0.])
 # starting params from gosh et al
@@ -366,7 +366,7 @@ plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
 print(len(no_cond_no_odour))
 print('score', np.mean(list(map(sum, no_cond_no_odour))), 'score std', np.std(list(map(sum, no_cond_no_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_no_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_no_odour))))
 
-plt.show()
-#plt.close('all')
+#plt.show()
+plt.close('all')
 
-#param_scan(0.06, 0.121, 0.01)
+param_scan(0.06, 0.121, 0.01)
