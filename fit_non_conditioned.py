@@ -469,11 +469,7 @@ elif opt == 'P':  # plot
     order = np.argsort(fitnesses)[::-1]
     population = population[order]
 
-
-
     all_sectors = []
-
-
 
     all_sectors = simulator.run_experiment_par(population[0:25])
 
@@ -500,11 +496,6 @@ elif opt == 'P':  # plot
 
     fig.suptitle('Violin plots of top 25 members of the evolutionary population')
     plt.savefig('violin_plots.png', dpi=300)
-
-
-
-
-
 
     print('score', np.mean(list(map(sum, no_cond_odour))), 'score std', np.std(list(map(sum, no_cond_odour))), 'range',
           np.mean(list(map(lambda x: max(x) - min(x), no_cond_odour))), 'range std',
