@@ -34,45 +34,13 @@ def param_scan(simulator, start, stop, step, save_path = './working_dir/param_sc
     if plot:
         plt.show()
 
-def evolve(simulator, n_gens, pop_size, save_path = './working_dir/evolution'):
-
-
-
-    population = np.random.random(size = (pop_size, 9))*20 - 10
-
-
-
-    for i in range(n_gens):
-        save_p = os.path.join(save_path, 'gen' + str(i))
-        os.makedirs(save_p, exist_ok=True)
-        fitnesses = simulator.get_fitnesses(population, n_worms)
-        np.save(save_p + '/population.npy', population)
-        np.save(save_p + '/fitnesses.npy', fitnesses)
-
-
-
-        order = np.argsort(fitnesses)[::-1]
-
-        fitnesses = np.array(fitnesses)[order]
-
-        population = population[order]
-
-        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
-
-
-        population[int(pop_size*0.8):] = np.random.random(size = (pop_size-int(pop_size*0.8), 9))*20-10
-
-
-        print('max: ', np.max(fitnesses), population[0])
-        print('mean: ', np.mean(fitnesses))
 
 
 def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/evolution_constrained'):
 
-    pos = np.random.random(size = (pop_size, 4))*10 # population of positive weights
-    neg = np.random.random(size = (pop_size, 5))*-10  # population of negative weights
 
-    population = np.hstack((pos, neg))
+
+    population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_aversive/221216_evolution_constrained/gen192/population.npy')
 
 
     fitnesses = simulator.get_fitnesses_par(population, n_worms)
@@ -90,15 +58,9 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/e
         population = population[order]
 
 
-        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
-        population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), :4] < 0] = 0
-        population[int(pop_size*0.4): int(pop_size*0.8), 4:][population[int(pop_size*0.4): int(pop_size*0.8), 4:] > 0] = 0
+        population[int(pop_size*0.5):] = population[:int(pop_size*0.5)] + np.random.random(size = ( int(pop_size*0.5), 9)) - 0.5
 
-
-        population[int(pop_size*0.8): , :4] = np.random.random(size = (pop_size-int(pop_size*0.8), 4))*10
-        population[int(pop_size*0.8): , 4:] = np.random.random(size = (pop_size-int(pop_size*0.8), 5))*-10
-
-        fitnesses[int(pop_size*0.4):] = simulator.get_fitnesses_par(population[int(pop_size*0.4):], n_worms)
+        fitnesses[int(pop_size*0.5):] = simulator.get_fitnesses_par(population[int(pop_size*0.5):], n_worms)
 
         print('gen', i)
         print('max: ', np.max(fitnesses), population[0])
@@ -106,10 +68,10 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/e
 
 
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
-
+print([len(x) for x in [no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour]])
 n_gens = 1000
 pop_size = 100
-n_worms = 215 # number of worms in each experiment
+n_worms = 304 # number of worms in each experiment
 
 
 # starting params from gosh et al
@@ -125,7 +87,8 @@ w_2 = w_3 = w_4 = w_5  = -2 # -ve weights
 w_1 = w_6 = w_7 = 2 # +ve weights
 w_8 = 0.5
 w_9 = -0.5
-dataset = no_cond_odour
+dataset = sex_odour
+print(len(dataset))
 simulator = WormSimulator(dataset = dataset, dt = 0.1)
 
 
@@ -136,7 +99,7 @@ simulator = WormSimulator(dataset = dataset, dt = 0.1)
 
 
 
-opt = 'T'
+opt = 'E'
 #sol = forward_euler(y0, parameters, dt, t_span[-1])
 
 
@@ -151,15 +114,13 @@ conc_interval = None
 params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
           speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
-path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/221214_fit_constrained/'
+path = ''
 
 if opt == 'E': # evolve
     evolve_constraints(simulator, n_gens, pop_size)
 elif opt == 'P':  # plot
     population = np.load(path + 'population.npy')
     fitnesses = np.load(path + 'fitnesses.npy')
-
-    print(population[0:10])
 
     order = np.argsort(fitnesses)[::-1]
     population = population[order]
@@ -206,8 +167,8 @@ elif opt == 'P':  # plot
 elif opt == 'T': # test
     n_worms = 1000
 
-    population = np.load(path + 'gen144/population.npy')
-    fitnesses = np.load(path + 'gen144/fitnesses.npy')
+    population = np.load(path + 'population.npy')
+    fitnesses = np.load(path + 'fitnesses.npy')
     order = np.argsort(fitnesses)[::-1]
     print(order)
 

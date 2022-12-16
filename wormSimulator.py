@@ -242,7 +242,7 @@ class WormSimulator():
 
 
         fitness = - (abs(mean_score - ms) + abs(mean_range - mr) + abs(std_score - ss) + abs(std_range - sr) + abs(skew_score - sks) + abs(skew_range - skr))
-
+        #print((abs(mean_score - ms), abs(mean_range - mr), abs(std_score - ss),abs(std_range - sr),abs(skew_score - sks),abs(skew_range - skr)))
         return fitness
 
     def get_fitnesses(self, population, n_worms):
@@ -291,11 +291,11 @@ class WormSimulator():
         sectors = self.run_experiment(params, n_worms)
         return sectors
 
-    def run_experiment_par(self, population):
+    def run_experiment_par(self, population, n_worms):
         n_cores = int(mp.cpu_count())
 
         with Pool(n_cores) as pool:
-            sectors = pool.map(self.run_experiment_wrapper, population)
+            sectors = pool.starmap(self.run_experiment_wrapper, zip(population, repeat(n_worms)))
 
         return sectors
 

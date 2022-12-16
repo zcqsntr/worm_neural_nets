@@ -7,324 +7,19 @@ import matplotlib.pyplot as plt
 import os
 import time
 from load_data import load_data
+from wormSimulator import WormSimulator
 
-theta = np.random.random() * 2 * np.pi
-last_sample = 0
 
 
-def gaussian(x, mu, sig):
-    return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
 
 
-def concentration_func(x,y,t):
 
-    origin = np.array([4.5, 0.])
 
-    delx = origin[0] - x
-    dely = origin[1] - y
-
-    dist = np.sqrt(delx**2 + dely**2)
-
-    std = 4
-
-    return gaussian(dist, mu=0, sig=std)*100
-
-
-def xdot(t, X, p):
-    global theta
-    global last_sample
-    global go_forward
-    plate_r = 3
-
-    AWC_v, AWC_f, AWC_s, AIB_v, AIA_v, AIY_v, x, y = X
-
-    AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = p
-
-    conc = concentration_func(x, y, t)
-
-    dAWC_f = AWC_f_a*conc - AWC_f_b*AWC_f
-    dAWC_s = AWC_s_gamma*(AWC_f - AWC_s)
-    AWC_i = AWC_f-AWC_s
-    dAWC_v = 1/tm *(-AWC_v + AWC_v0 + np.tanh(-AWC_gain*AWC_i)) # -ve in tanh because downstep in conc activates AWC
-
-    AIB_i = w_1*AWC_v + w_4*AIA_v
-    dAIB_v = 1/tm *(-AIB_v + AIB_v0 + np.tanh(AIB_i)) # removed gains as redundant with the weights
-
-
-    AIA_i = w_2 * AWC_v + w_5*AIB_v + w_6*AIY_v
-    dAIA_v = 1 / tm * (-AIA_v + AIA_v0 + np.tanh(AIA_i))
-
-    AIY_i = w_3 * AWC_v + w_7 * AIA_v
-    dAIY_v = 1 / tm * (-AIY_v + AIY_v0 + np.tanh(AIY_i))
-
-    #go_forward = (np.random.random()*2 - 1) < AIY_v
-
-    turn = (np.random.random() * 2 - 1) < np.tanh(w_8*AIB_v + w_9*AIY_v) # dt = sample_time so just make this decision every time
-
-    if turn:
-        theta = np.random.random() * 2 * np.pi
-
-    dx = speed * np.cos(theta)
-    dy = speed * np.sin(theta)
-
-    # stop worms going off the plate by choosing another random direction, this stops them getting stuck on the edge
-    x, y = X[6], X[7]
-    while abs((x+dx)**2 + (y+dy)**2)**0.5 > plate_r:
-        theta = np.random.random() * 2 * np.pi
-        dx = speed * np.cos(theta)
-        dy = speed * np.sin(theta)
-
-
-
-    return dAWC_v, dAWC_f, dAWC_s, dAIB_v, dAIA_v, dAIY_v, dx, dy
-
-def plot_sol(solution, save_path = None):
-
-
-
-    #plot neuron voltages
-    plt.figure()
-    plt.plot(solution[0, :], label = 'AWC')
-    plt.plot(solution[3, :], label = 'AIB')
-    plt.plot(solution[4, :], label = 'AIA')
-    plt.plot(solution[5, :], label = 'AIY')
-    plt.legend()
-
-    if save_path is not None:
-        plt.savefig(os.path.join(save_path, 'voltages.pdf'))
-
-    #plot sensory neuron components
-
-    plt.figure()
-    plt.plot(solution[1,:], label = 'AWC fast')
-    plt.plot(solution[2,:], label = 'AWC slow')
-    plt.legend()
-
-    if save_path is not None:
-        plt.savefig(os.path.join(save_path, 'sensory.pdf'))
-
-
-    # plot worm position
-    fig, ax = plt.subplots(figsize = [6.4,6.4])
-
-    # plate outline
-    circle = plt.Circle([0,0], plate_r, fill=False)
-    ax.add_patch(circle)
-
-    # scoring sectors
-    pos = [-origin, origin]
-    rad = [2.5, 3.5]
-
-    for p in pos:
-        for r in rad:
-            circle = plt.Circle(p, r, fill=False, color='gray')
-            ax.add_patch(circle)
-
-    ax.vlines(0, domain[0], domain[1], color='grey')
-
-    ax.plot(solution[6,:], solution[7,:])
-    ax.scatter(solution[6,0], solution[7,0], label = 'start')
-    ax.scatter(solution[6,-1], solution[7,-1], label = 'end')
-
-
-    plt.xlim(domain[0], domain[1])
-    plt.ylim(domain[0], domain[1])
-
-    plt.legend(loc = 'lower left')
-
-    if save_path is not None:
-        plt.savefig(os.path.join(save_path, 'worm.pdf'))
-
-
-def plot_conc(domain):
-    plt.figure()
-    x = np.arange(domain[0], domain[1], 0.001)
-    y = np.arange(domain[0], domain[1], 0.001)
-    X, Y = np.meshgrid(x, y)
-
-    img = concentration_func(X,Y,0)
-
-    plt.imshow(img, extent=[domain[0], domain[1], domain[1], domain[0]])
-    plt.colorbar()
-
-
-def score_worm(solution):
-    trajectory = solution[6:8, :]
-    x = trajectory[0, :]
-    y = trajectory[1, :]
-    delx = origin[0] - x
-    dely = origin[1] - y
-
-    origin_dist = np.sqrt(delx ** 2 + dely ** 2)
-
-    mirror_origin = -origin
-    delx = mirror_origin[0] - x
-    dely = mirror_origin[1] - y
-
-    mirror_origin_dist = np.sqrt(delx ** 2 + dely ** 2)
-
-    sectors = []
-
-    if np.any(mirror_origin_dist < 2.5):
-        sectors.append(-3)
-    if np.any(mirror_origin_dist < 3.5):
-        sectors.append(-2)
-
-    if np.any(origin_dist < 2.5):
-        sectors.append(3)
-
-    if np.any(origin_dist < 3.5):
-        sectors.append(2)
-
-    if np.any(x < 0):
-        sectors.append(-1)
-    if np.any(x > 0):
-        sectors.append(1)
-
-    return sectors
-
-
-def run_experiment(params, n_worms):
-    global theta
-    global last_sample
-
-    sectors = []
-
-
-
-    for i in range(n_worms):
-
-        theta = np.random.random() * 2 * np.pi
-        last_sample = 0
-
-        sol = forward_euler(y0, params, dt, t_span[-1])
-
-        sector = score_worm(sol)
-
-        sectors.append(sector)
-
-
-    return sectors
-
-
-
-def get_fitnesses(population):
-
-    # values form the no cond no odor data
-    ms = np.mean(list(map(sum, no_cond_no_odour)))
-    ss = np.std(list(map(sum, no_cond_no_odour)))
-    mr = np.mean(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
-    sr = np.std(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
-
-    fitnesses = []
-
-    parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-         speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
-    all_sectors = []
-
-
-    for p in population:
-
-        params = parameters
-
-        # positive weights
-        params[10] = p[0]
-        params[15] = p[1]
-        params[16] = p[2]
-        params[17] = p[3]
-
-        # negative weights
-        params[11] = p[4]
-        params[12] = p[5]
-        params[13] = p[6]
-        params[14] = p[7]
-        params[18] = p[8]
-
-        sectors = run_experiment(params, n_worms)
-
-        all_sectors.append(sectors)
-
-        mean_score = np.mean(list(map(sum, sectors)))
-        std_score = np.std(list(map(sum, sectors)))
-        mean_range = np.mean(list(map(lambda x: max(x) - min(x), sectors)))
-        std_range = np.std(list(map(lambda x: max(x) - min(x), sectors)))
-
-        fitness = - (abs(mean_score-ms) + abs(mean_range-mr) + abs(std_score-ss) + abs(std_range-sr))
-
-        fitnesses.append(fitness)
-        print(p, fitness)
-
-    return fitnesses, all_sectors
-
-
-def evolve_constraints():
-
-    pos = np.random.random(size = (pop_size, 4))*10 # population of positive weights
-    neg = np.random.random(size = (pop_size, 5))*-10  # population of negative weights
-
-    population = np.hstack((pos, neg))
-
-
-    for i in range(n_gens):
-        fitnesses = get_fitnesses(population)
-
-        order = np.argsort(fitnesses)[::-1]
-
-        fitnesses = np.array(fitnesses)[order]
-
-        population = population[order]
-
-        sol = solve_ivp(xdot, t_span, y0, t_eval=np.arange(t_span[-1]), args=(parameters[:-1] + list(population[0]),))
-        save_path = os.path.join('working_dir', 'gen'+str(i))
-        os.makedirs(save_path, exist_ok=True)
-        plot_sol(sol.y, save_path=save_path)
-
-        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
-        population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), :4] < 0] = 0
-        population[int(pop_size*0.4): int(pop_size*0.8), 4:][population[int(pop_size*0.4): int(pop_size*0.8), 4:] > 0] = 0
-
-
-        population[int(pop_size*0.8): , :4] = np.random.random(size = (pop_size-int(pop_size*0.8), 4))*10
-        population[int(pop_size*0.8): , 4:] = np.random.random(size = (pop_size-int(pop_size*0.8), 5))*-10
-
-
-
-        print('max: ', np.max(fitnesses), population[0])
-        print('mean: ', np.mean(fitnesses))
-
-
-def evolve():
-
-    population = np.random.random(size = (pop_size, 9))*20 - 10
-
-    for i in range(n_gens):
-        fitnesses = get_fitnesses(population)
-
-        order = np.argsort(fitnesses)[::-1]
-
-        fitnesses = np.array(fitnesses)[order]
-
-        population = population[order]
-
-        sol = solve_ivp(xdot, t_span, y0, t_eval=np.arange(t_span[-1]), args=(parameters[:-1] + list(population[0]),))
-        save_path = os.path.join('working_dir', 'gen'+str(i))
-        os.makedirs(save_path, exist_ok=True)
-        plot_sol(sol.y, save_path=save_path)
-
-        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
-
-
-        population[int(pop_size*0.8):] = np.random.random(size = (pop_size-int(pop_size*0.8), 9))*20-10
-
-
-        print('max: ', np.max(fitnesses), population[0])
-        print('mean: ', np.mean(fitnesses))
-
-def param_scan(start, stop, step, save_path = './working_dir/param_scan', plot=True):
+def param_scan(simulator, start, stop, step, save_path = './working_dir/param_scan', plot=True):
     os.makedirs(save_path, exist_ok = True)
     population = np.arange(start, stop, step).reshape(-1, 1)
 
-    fitnesses, all_sectors  = get_fitnesses(population)
+    fitnesses, all_sectors  = simulator.get_fitnesses(population)
 
 
 
@@ -340,25 +35,44 @@ def param_scan(start, stop, step, save_path = './working_dir/param_scan', plot=T
         plt.show()
 
 
-def forward_euler(y0, params, dt, tmax):
-    AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = params
+def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/evolution_constrained'):
 
-    y = y0
-    all_ys = [y0]
 
-    for t in np.arange(0, tmax+dt, dt):
-        y = y + np.array(xdot(t, y, params))*dt
-        all_ys.append(y)
 
-    return np.array(all_ys).T
+    population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/221214_fit_constrained/gen144/population.npy')
+
+
+    fitnesses = simulator.get_fitnesses_par(population, n_worms)
+    for i in range(n_gens):
+
+        save_p = os.path.join(save_path, 'gen' + str(i))
+        os.makedirs(save_p, exist_ok=True)
+
+        np.save(save_p + '/population.npy', population)
+        np.save(save_p + '/fitnesses.npy', fitnesses)
+
+        order = np.argsort(fitnesses)[::-1]
+        fitnesses = np.array(fitnesses)[order]
+
+        population = population[order]
+
+
+        population[int(pop_size*0.5):] = population[:int(pop_size*0.5)] + np.random.random(size = ( int(pop_size*0.5), 9)) - 0.5
+
+        fitnesses[int(pop_size*0.5):] = simulator.get_fitnesses_par(population[int(pop_size*0.5):], n_worms)
+
+        print('gen', i)
+        print('max: ', np.max(fitnesses), population[0])
+        print('mean: ', np.mean(fitnesses))
+
 
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
 
-n_gens = 100
+n_gens = 1000
 pop_size = 100
-n_worms = 90 # number of worms in each experiment
+n_worms = 271 # number of worms in each experiment
 
-origin = np.array([4.5, 0.])
+
 # starting params from gosh et al
 tm = 0.5 #s
 AIB_v0 = AIA_v0 = AIY_v0 = AWC_v0 = 0
@@ -368,39 +82,165 @@ AWC_f_b = 15 #1/s
 AWC_s_gamma = 2 #1/s
 speed = 0.11 #mm/s
 
-domain = [-3,3]
-plate_r = 3
 w_2 = w_3 = w_4 = w_5  = -2 # -ve weights
 w_1 = w_6 = w_7 = 2 # +ve weights
 w_8 = 0.5
 w_9 = -0.5
-
-sample_time = 0.1 #s
-dt = 0.1
-parameters = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0,  AIA_v0, AIY_v0,
-         speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9]
+dataset = aversive_odour
+print(len(dataset))
+simulator = WormSimulator(dataset = dataset, dt = 0.1)
 
 
 
-t_span = [0, 1200] #s
 
-y0 = [0, 0, 0, 0, 0, 0, 0, 0]
 #sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
 
-plt.violinplot(list(map(sum, aversive_odour)))
-plt.figure()
-plt.violinplot(list(map(lambda x: max(x) - min(x), aversive_odour)))
-print(len(aversive_odour))
-
-print('score', np.mean(list(map(sum, aversive_odour))), 'score std', np.std(list(map(sum, aversive_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), aversive_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), aversive_odour))))
 
 
-sol = forward_euler(y0, parameters, dt, t_span[-1])
 
-#evolve()
+opt = 'T'
+#sol = forward_euler(y0, parameters, dt, t_span[-1])
 
-print(score_worm(sol))
 
-plot_sol(sol)
-plot_conc(domain)
-plt.show()
+#evolve_constraints()
+
+#print(score_worm(sol))
+
+
+worm_trapped = False
+conc_interval = None
+
+params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
+          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
+
+path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_aversive/221216_evolution_constrained/'
+
+if opt == 'E': # evolve
+    evolve_constraints(simulator, n_gens, pop_size)
+elif opt == 'P':  # plot
+    population = np.load(path + 'population.npy')
+    fitnesses = np.load(path + 'fitnesses.npy')
+
+    order = np.argsort(fitnesses)[::-1]
+    population = population[order]
+
+    all_sectors = []
+
+    all_sectors = simulator.run_experiment_par(population[0:25], n_worms)
+
+    ncols = 5
+    fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
+
+
+    ms_errors = []
+    ss_errors = []
+    mr_errors = []
+    sr_errors = []
+
+    for i, sectors in enumerate(all_sectors):
+
+        ax = axs[i // ncols, i  % ncols]
+        ax.violinplot([sum(s) for s in sectors])
+
+        ax.set_ylim(bottom=-6.1, top=6.1)
+
+        ax.violinplot(list(map(sum, dataset)))
+        ax.violinplot(list(map(sum, sectors)))
+
+
+
+    fig.suptitle('Violin plots of top 25 members of the evolutionary population')
+    plt.savefig('violin_plots.png', dpi=300)
+
+    print('score', np.mean(list(map(sum, dataset))), 'score std', np.std(list(map(sum, dataset))), 'range',
+          np.mean(list(map(lambda x: max(x) - min(x), dataset))), 'range std',
+          np.std(list(map(lambda x: max(x) - min(x), dataset))))
+
+
+    print('score', np.mean(list(map(sum, sectors))), 'score std', np.std(list(map(sum, sectors))), 'range',
+          np.mean(list(map(lambda x: max(x) - min(x), sectors))), 'range std',
+          np.std(list(map(lambda x: max(x) - min(x), sectors))))
+
+    plt.show()
+
+elif opt == 'T': # test
+    n_worms = 1000
+
+    population = np.load(path + 'population.npy')
+    fitnesses = np.load(path + 'fitnesses.npy')
+    order = np.argsort(fitnesses)[::-1]
+    print(order)
+
+    t = time.time()
+    fitnesses = simulator.get_fitnesses_par(population, n_worms)
+    print(time.time() - t)
+    order = np.argsort(fitnesses)[::-1]
+    print(order)
+
+    np.save(path + 'population.npy', population)
+    np.save(path + 'fitnesses.npy', fitnesses)
+
+elif opt == 'S': # simulate
+    population = np.load(
+        path + 'population.npy')
+
+    fitnesses = np.load(path + 'fitnesses.npy')
+
+    order = np.argsort(fitnesses)[::-1]
+    population = population[order]
+
+    p = population[0]
+
+
+    # positive weights
+    params[10] = p[0]
+    params[15] = p[1]
+    params[16] = p[2]
+    params[17] = p[3]
+
+    # negative weights
+    params[11] = p[4]
+    params[12] = p[5]
+    params[13] = p[6]
+    params[14] = p[7]
+    params[18] = p[8]
+
+    sol = simulator.forward_euler(simulator.y0, params)
+
+    print(simulator.score_worm(sol))
+
+    simulator.plot_sol(sol)
+
+    plt.show()
+
+elif opt == 'C': # test worm in the calcium imaging experiment
+    worm_trapped = True
+    conc_interval = [10, 40]
+    max_t = 70
+    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
+              speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
+
+    population = np.load(
+        path + 'population.npy')
+    p = population[0]
+
+    # positive weights
+    params[10] = p[0]
+    params[15] = p[1]
+    params[16] = p[2]
+    params[17] = p[3]
+
+    # negative weights
+    params[11] = p[4]
+    params[12] = p[5]
+    params[13] = p[6]
+    params[14] = p[7]
+    params[18] = p[8]
+    simulator.t_span[-1] = max_t
+    sol = simulator.forward_euler(simulator.y0, params)
+
+    print(simulator.score_worm(sol))
+
+    simulator.plot_sol(sol)
+    simulator.plot_conc()
+    plt.show()
