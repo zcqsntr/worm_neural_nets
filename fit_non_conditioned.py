@@ -76,9 +76,9 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/wor
 
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data(dir_path + '/data/behaviourdatabysector_NT.csv')
 
-n_gens = 2
-pop_size = 10
-n_worms = 2 # number of worms in each experiment
+n_gens = 212
+pop_size = 100
+n_worms = 100 # number of worms in each experiment
 
 
 # starting params from gosh et al
@@ -96,6 +96,7 @@ w_2 = w_3 = w_4 = w_5  = -2 # -ve weights
 
 
 dataset = no_cond_odour
+print(len(dataset))
 simulator = WormSimulator(dataset = dataset, dt = 0.1)
 
 #sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
