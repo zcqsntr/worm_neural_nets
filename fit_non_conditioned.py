@@ -76,9 +76,13 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/wor
 
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data(dir_path + '/data/behaviourdatabysector_NT.csv')
 
-n_gens = 212
+n_gens = 100
 pop_size = 100
-n_worms = 100 # number of worms in each experiment
+
+
+dataset = no_cond_odour
+print(len(dataset))
+n_worms = len(dataset)# number of worms in each experiment
 
 
 # starting params from gosh et al
@@ -91,30 +95,27 @@ AWC_s_gamma = 2 #1/s
 speed = 0.11 #mm/s
 
 
-w_1 = w_6 = w_7 = 2 # +ve weights
-w_2 = w_3 = w_4 = w_5  = -2 # -ve weights
+w_1 = w_6 = w_7 = 1.5 # +ve weights
+w_2 = w_3 = w_4 = w_5  = -1.5 # -ve weights
 
 
-dataset = no_cond_odour
-print(len(dataset))
+
 simulator = WormSimulator(dataset = dataset, dt = 0.1)
-
-#sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
-
-opt = 'E'
-#sol = forward_euler(y0, parameters, dt, t_span[-1])
-
-
-#evolve_constraints()
-
-#print(score_worm(sol))
-
-
 worm_trapped = False
 conc_interval = None
 
 params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
           speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, worm_trapped, conc_interval]
+
+#sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
+
+opt = 'E'
+
+
+
+
+
+
 
 path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/221214_fit_constrained/'
 

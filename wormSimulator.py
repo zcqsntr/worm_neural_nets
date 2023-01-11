@@ -1,5 +1,5 @@
 import numpy as np
-
+import matplotlib.pyplot as plt
 import os
 from scipy import stats
 from multiprocessing import Pool
@@ -68,7 +68,7 @@ class WormSimulator():
             dy = dx = 0
         else:
 
-            turn = (np.random.random() * 2 - 1) < np.tanh(AIB_v - AIY_v) # dt = sample_time so just make this decision every time
+            turn = (np.random.random() * 2 - 1) < np.tanh(AIB_v -AIY_v) # dt = sample_time so just make this decision every time
 
             if turn:
                 self.theta = np.random.random() * 2 * np.pi
