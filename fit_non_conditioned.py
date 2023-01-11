@@ -1,15 +1,20 @@
 
 from scipy.integrate import solve_ivp
 import numpy as np
-import matplotlib as mpl
-mpl.use('tkagg')
-import matplotlib.pyplot as plt
-import os
+import sys
 import time
 from load_data import load_data
 from wormSimulator import WormSimulator
 
+on_cluster = len(sys.argv) > 1
 
+
+if not on_cluster:
+    import matplotlib as mpl
+
+    mpl.use('tkagg')
+    import matplotlib.pyplot as plt
+    import os
 
 
 def param_scan(simulator, start, stop, step, save_path = './working_dir/param_scan', plot=True):
