@@ -8,7 +8,7 @@ from itertools import repeat
 
 class WormSimulator():
     def __init__(self, dataset, dt, t_span=[0,1200], y0=[0, 0, 0, 0, 0, 0, 0, 0]):
-        self.params =[4, 15, 2, 0.5, 0, 2, 0, 0, 0, 0.11, 2, -2, -2, -2, -2, 2, 2, 0.5, -0.5, False, None] # [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
+        self.params =[4, 15, 2, 0.5, 0, 2, 0, 0, 0, 0.11, 2, -2, -2, -2, -2, 2, 2, False, None] # [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
         self.dt = dt
         self.t_span = t_span  # s
         self.y0 = y0
@@ -43,7 +43,7 @@ class WormSimulator():
 
         AWC_v, AWC_f, AWC_s, AIB_v, AIA_v, AIY_v, x, y = X
 
-        AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval = p
+        AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, worm_trapped, conc_interval = p
 
         conc = self.concentration_func(x, y, t, conc_interval)
 
@@ -68,7 +68,7 @@ class WormSimulator():
             dy = dx = 0
         else:
 
-            turn = (np.random.random() * 2 - 1) < np.tanh(w_8*AIB_v + w_9*AIY_v) # dt = sample_time so just make this decision every time
+            turn = (np.random.random() * 2 - 1) < np.tanh(AIB_v - AIY_v) # dt = sample_time so just make this decision every time
 
             if turn:
                 self.theta = np.random.random() * 2 * np.pi
@@ -86,6 +86,8 @@ class WormSimulator():
 
 
         return dAWC_v, dAWC_f, dAWC_s, dAIB_v, dAIA_v, dAIY_v, dx, dy
+
+
 
     def plot_sol(self, solution, save_path = None):
         fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(25, 7.5))
@@ -220,14 +222,12 @@ class WormSimulator():
         params[10] = weights[0]
         params[15] = weights[1]
         params[16] = weights[2]
-        params[17] = weights[3]
 
         # negative weights
-        params[11] = weights[4]
-        params[12] = weights[5]
-        params[13] = weights[6]
-        params[14] = weights[7]
-        params[18] = weights[8]
+        params[11] = weights[3]
+        params[12] = weights[4]
+        params[13] = weights[5]
+        params[14] = weights[6]
 
         sectors = self.run_experiment(params, n_worms)
 

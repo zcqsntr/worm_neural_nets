@@ -99,7 +99,8 @@ simulator = WormSimulator(dataset = dataset, dt = 0.1)
 
 
 
-opt = 'E'
+
+opt = 'C'
 #sol = forward_euler(y0, parameters, dt, t_span[-1])
 
 
@@ -114,7 +115,7 @@ conc_interval = None
 params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
           speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
-path = ''
+path = '/home/neythen/Desktop/Projects/worm_neural_nets/working_dir/evolution_constrained/'
 
 if opt == 'E': # evolve
     evolve_constraints(simulator, n_gens, pop_size)
@@ -167,8 +168,8 @@ elif opt == 'P':  # plot
 elif opt == 'T': # test
     n_worms = 1000
 
-    population = np.load(path + 'population.npy')
-    fitnesses = np.load(path + 'fitnesses.npy')
+    population = np.load(path + 'gen226/population.npy')
+    fitnesses = np.load(path + 'gen226/fitnesses.npy')
     order = np.argsort(fitnesses)[::-1]
     print(order)
 
@@ -223,25 +224,34 @@ elif opt == 'C': # test worm in the calcium imaging experiment
 
     population = np.load(
         path + 'population.npy')
-    p = population[0]
+    ncols = 5
+    fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
+    for i in range(25):
+        p = population[i]
 
-    # positive weights
-    params[10] = p[0]
-    params[15] = p[1]
-    params[16] = p[2]
-    params[17] = p[3]
+        # positive weights
+        params[10] = p[0]
+        params[15] = p[1]
+        params[16] = p[2]
+        params[17] = p[3]
 
-    # negative weights
-    params[11] = p[4]
-    params[12] = p[5]
-    params[13] = p[6]
-    params[14] = p[7]
-    params[18] = p[8]
-    simulator.t_span[-1] = max_t
-    sol = simulator.forward_euler(simulator.y0, params)
+        # negative weights
+        params[11] = p[4]
+        params[12] = p[5]
+        params[13] = p[6]
+        params[14] = p[7]
+        params[18] = p[8]
 
-    print(simulator.score_worm(sol))
+        simulator.t_span[-1] = max_t
+        solution = simulator.forward_euler(simulator.y0, params)
 
-    simulator.plot_sol(sol)
-    simulator.plot_conc()
+        # plot neuron voltages
+        ax = axs[i // ncols, i % ncols]
+        ax.plot(np.arange(0, max_t, simulator.dt), solution[0, 1:-1], label='AWC')
+        ax.plot(np.arange(0, max_t, simulator.dt), solution[3, 1:-1], label='AIB')
+        ax.plot(np.arange(0, max_t, simulator.dt), solution[5, 1:-1], label='AIY')
+        ax.legend()
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Neuron voltages')
+        # simulator.plot_conc()
     plt.show()

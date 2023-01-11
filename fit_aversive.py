@@ -66,6 +66,8 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/e
         print('mean: ', np.mean(fitnesses))
 
 
+
+
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
 
 n_gens = 1000
@@ -98,7 +100,7 @@ simulator = WormSimulator(dataset = dataset, dt = 0.1)
 
 
 
-opt = 'T'
+opt = 'C'
 #sol = forward_euler(y0, parameters, dt, t_span[-1])
 
 
@@ -222,25 +224,34 @@ elif opt == 'C': # test worm in the calcium imaging experiment
 
     population = np.load(
         path + 'population.npy')
-    p = population[0]
+    ncols = 5
+    fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
+    for i in range(25):
+        p = population[i]
 
-    # positive weights
-    params[10] = p[0]
-    params[15] = p[1]
-    params[16] = p[2]
-    params[17] = p[3]
+        # positive weights
+        params[10] = p[0]
+        params[15] = p[1]
+        params[16] = p[2]
+        params[17] = p[3]
 
-    # negative weights
-    params[11] = p[4]
-    params[12] = p[5]
-    params[13] = p[6]
-    params[14] = p[7]
-    params[18] = p[8]
-    simulator.t_span[-1] = max_t
-    sol = simulator.forward_euler(simulator.y0, params)
+        # negative weights
+        params[11] = p[4]
+        params[12] = p[5]
+        params[13] = p[6]
+        params[14] = p[7]
+        params[18] = p[8]
 
-    print(simulator.score_worm(sol))
+        simulator.t_span[-1] = max_t
+        solution = simulator.forward_euler(simulator.y0, params)
 
-    simulator.plot_sol(sol)
-    simulator.plot_conc()
+        # plot neuron voltages
+        ax = axs[i // ncols, i % ncols]
+        ax.plot(np.arange(0, max_t, simulator.dt), solution[0, 1:-1], label='AWC')
+        ax.plot(np.arange(0, max_t, simulator.dt), solution[3, 1:-1], label='AIB')
+        ax.plot(np.arange(0, max_t, simulator.dt), solution[5, 1:-1], label='AIY')
+        ax.legend()
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Neuron voltages')
+        # simulator.plot_conc()
     plt.show()
