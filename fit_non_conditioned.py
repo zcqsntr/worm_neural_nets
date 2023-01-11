@@ -1,5 +1,5 @@
 
-from scipy.integrate import solve_ivp
+
 import numpy as np
 import sys
 import time
