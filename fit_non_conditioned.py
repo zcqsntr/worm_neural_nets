@@ -76,8 +76,8 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/e
 
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
 
-n_gens = 100
-pop_size = 100
+n_gens = 2
+pop_size = 10
 n_worms = 215 # number of worms in each experiment
 
 
