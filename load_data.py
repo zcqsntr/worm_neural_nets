@@ -1,6 +1,4 @@
-import matplotlib as mpl
-mpl.use('tkagg')
-import matplotlib.pyplot as plt
+
 import numpy as np
 
 def int_wrap(string):
@@ -43,14 +41,3 @@ for d in [no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour]:
     plt.violinplot(list(map(sum, d)))
     
 '''
-
-
-if __name__ == '__main__':
-    no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data(
-        './data/behaviourdatabysector_NT.csv')
-    plt.violinplot(list(map(sum, no_cond_no_odour)))
-    plt.figure()
-    plt.violinplot(list(map(lambda x: max(x) - min(x), no_cond_no_odour)))
-    print(len(no_cond_no_odour))
-    print('score', np.mean(list(map(sum, no_cond_no_odour))), 'score std', np.std(list(map(sum, no_cond_no_odour))), 'range', np.mean(list(map(lambda x: max(x) - min(x), no_cond_no_odour))), 'range std', np.std(list(map(lambda x: max(x) - min(x), no_cond_no_odour))))
-    plt.show()
