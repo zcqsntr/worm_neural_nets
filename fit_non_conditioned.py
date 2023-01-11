@@ -1,5 +1,5 @@
 
-
+import os
 import numpy as np
 import sys
 import time
@@ -7,17 +7,17 @@ from load_data import load_data
 from wormSimulator import WormSimulator
 
 on_cluster = len(sys.argv) > 1
-
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 if not on_cluster:
     import matplotlib as mpl
 
     mpl.use('tkagg')
     import matplotlib.pyplot as plt
-    import os
 
 
-def param_scan(simulator, start, stop, step, save_path = './working_dir/param_scan', plot=True):
+
+def param_scan(simulator, start, stop, step, save_path = dir_path + '/working_dir/param_scan', plot=True):
     os.makedirs(save_path, exist_ok = True)
     population = np.arange(start, stop, step).reshape(-1, 1)
 
@@ -36,7 +36,7 @@ def param_scan(simulator, start, stop, step, save_path = './working_dir/param_sc
     if plot:
         plt.show()
 
-def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/evolution_constrained'):
+def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/working_dir/evolution_constrained'):
 
     pos = np.random.random(size = (pop_size, 3))*10 # population of positive weights
     neg = np.random.random(size = (pop_size, 4))*-10  # population of negative weights
@@ -59,13 +59,13 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/e
         population = population[order]
 
 
-        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 9))*2 - 1.
-        population[int(pop_size*0.4): int(pop_size*0.8), :4][population[int(pop_size*0.4): int(pop_size*0.8), 0:3] < 0] = 0
-        population[int(pop_size*0.4): int(pop_size*0.8), 4:][population[int(pop_size*0.4): int(pop_size*0.8), 3:7] > 0] = 0
+        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 7))*2 - 1.
+        population[int(pop_size*0.4): int(pop_size*0.8), 0:3][population[int(pop_size*0.4): int(pop_size*0.8), 0:3] < 0] = 0
+        population[int(pop_size*0.4): int(pop_size*0.8), 3:7][population[int(pop_size*0.4): int(pop_size*0.8), 3:7] > 0] = 0
 
 
-        population[int(pop_size*0.8): , 0:4] = np.random.random(size = (pop_size-int(pop_size*0.8), 3))*10
-        population[int(pop_size*0.8): , 4:8] = np.random.random(size = (pop_size-int(pop_size*0.8), 4))*-10
+        population[int(pop_size*0.8): , 0:3] = np.random.random(size = (pop_size-int(pop_size*0.8), 3))*10
+        population[int(pop_size*0.8): , 3:7] = np.random.random(size = (pop_size-int(pop_size*0.8), 4))*-10
 
         fitnesses[int(pop_size*0.4):] = simulator.get_fitnesses_par(population[int(pop_size*0.4):], n_worms)
 
@@ -74,11 +74,11 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/e
         print('mean: ', np.mean(fitnesses))
 
 
-no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
+no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data(dir_path + '/data/behaviourdatabysector_NT.csv')
 
 n_gens = 2
 pop_size = 10
-n_worms = 215 # number of worms in each experiment
+n_worms = 2 # number of worms in each experiment
 
 
 # starting params from gosh et al
