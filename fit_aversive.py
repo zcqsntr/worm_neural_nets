@@ -138,7 +138,7 @@ fit_w8_w9 = False
 params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
           speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
-path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_aversive/230116_aversive/gen99/'
+path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/worm_simulation_results_NT/230116_aversive/fitting_output/'
 '''
 max:  -1.2449320222615108 [ 2.88911244 -3.63632838 -0.06456711  1.          4.01216015  9.11383075
  -1.82794145 -6.02636742 -1.        ]
@@ -214,9 +214,9 @@ elif opt == 'T': # test
 
 elif opt == 'S': # simulate
     population = np.load(
-        path + '/population.npy')
+        path + '/weights_population.npy')
 
-    fitnesses = np.load(path + '/fitnesses.npy')
+    fitnesses = np.load(path + '/final_fitnesses.npy')
 
     order = np.argsort(fitnesses)[::-1]
     population = population[order]
@@ -252,12 +252,12 @@ elif opt == 'C': # test worm in the calcium imaging experiment
               speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
     population = np.load(
-        path + '/population.npy')
+        path + '/weights_population.npy')
 
 
-    ncols = 5
-    fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
-    for i in range(25):
+    ncols = 10
+    fig, axs = plt.subplots(nrows=10, ncols=ncols, figsize=(15, 7.5))
+    for i in range(len(population)):
         p = population[i]
 
         # positive weights
@@ -278,6 +278,7 @@ elif opt == 'C': # test worm in the calcium imaging experiment
 
         # plot neuron voltages
         ax = axs[i // ncols, i % ncols]
+        ax.set_ylim(bottom=-1., top=1.)
         ax.plot(np.arange(0, max_t, simulator.dt), solution[0, 1:-1], label='AWC')
         ax.plot(np.arange(0, max_t, simulator.dt), solution[3, 1:-1], label='AIB')
         ax.plot(np.arange(0, max_t, simulator.dt), solution[5, 1:-1], label='AIY')

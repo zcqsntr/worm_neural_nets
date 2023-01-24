@@ -5,7 +5,7 @@ import sys
 import time
 from load_data import load_data
 from wormSimulator import WormSimulator
-
+import copy
 on_cluster = len(sys.argv) > 1
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -128,7 +128,7 @@ params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, A
 
 #sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
 
-opt = 'S'
+opt = 'scan'
 
 
 path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/worm_simulation_results_NT/230111_mock/fitting_output/'
@@ -136,8 +136,9 @@ path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/worm_simulation_
 if opt == 'E': # evolve
     evolve_constraints(simulator, n_gens, pop_size)
 elif opt == 'P':  # plot
-    population = np.load(path + 'population.npy')
-    fitnesses = np.load(path + 'fitnesses.npy')
+    t = time.time()
+    population = np.load(path + 'weights_population.npy')
+    fitnesses = np.load(path + 'final_fitnesses.npy')
 
     print(population.shape)
 
@@ -180,8 +181,41 @@ elif opt == 'P':  # plot
     print('score', np.mean(list(map(sum, sectors))), 'score std', np.std(list(map(sum, sectors))), 'range',
           np.mean(list(map(lambda x: max(x) - min(x), sectors))), 'range std',
           np.std(list(map(lambda x: max(x) - min(x), sectors))))
-
+    print(time.time() - t)
     plt.show()
+
+elif opt == 'scan':  # quick param scan after arantza's email
+    starting_weights = np.load(path + 'weights_population.npy')[0]
+
+    print(starting_weights)
+    all_test_weights = []
+    for w_1 in range(-10, 11, 2):
+
+        for w_9 in range(-10, 11, 2):
+            test_weights = copy.deepcopy(starting_weights)
+            test_weights[0] = w_1
+            test_weights[8] = w_9
+            all_test_weights.append(test_weights)
+    print(len(all_test_weights))
+    all_sectors = simulator.run_experiment_par(all_test_weights, n_worms)
+    np.save(path + 'all_sectors.npy', all_sectors)
+
+    ncols = 10
+    fig, axs = plt.subplots(nrows=13, ncols=ncols, figsize=(15, 7.5))
+
+    for i, sectors in enumerate(all_sectors):
+        ax = axs[i // ncols, i % ncols]
+
+        ax.set_ylim(bottom=-6.1, top=6.1)
+
+        ax.violinplot(list(map(sum, dataset)))
+        ax.violinplot(list(map(sum, sectors)))
+
+    fig.suptitle('Violin plots')
+    plt.savefig('violin_plots.pdf')
+    plt.show()
+
+
 
 elif opt == 'T': # test
     n_worms = 1000
@@ -241,9 +275,9 @@ elif opt == 'C': # test worm in the calcium imaging experiment
 
     #population = np.load(path + 'gen99/population.npy')
 
-    population = np.load('/results/final_results/230111_mock/fitting_data/weights_population.npy')
-    ncols = 5
-    fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
+    population = np.load(path + 'weights_population.npy')
+    ncols = 10
+    fig, axs = plt.subplots(nrows=10, ncols=ncols, figsize=(15, 7.5))
     calcium_sims = []
 
     for i in range(len(population)):
@@ -267,17 +301,20 @@ elif opt == 'C': # test worm in the calcium imaging experiment
         calcium_sims.append(solution)
 
         # plot neuron voltages
-        '''
+
         ax = axs[i // ncols, i  % ncols]
+        ax.set_ylim(bottom=-1., top = 1.)
         ax.plot(np.arange(0, max_t, simulator.dt), solution[0, 1:-1], label='AWC')
         ax.plot(np.arange(0, max_t, simulator.dt), solution[3, 1:-1], label='AIB')
         ax.plot(np.arange(0, max_t, simulator.dt), solution[5, 1:-1], label='AIY')
         ax.legend()
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Neuron voltages')
-        '''
+
 
         #simulator.plot_conc()
 
-    np.save('/results/final_results/230111_mock/fitting_data/final_calcium_sims.npy', calcium_sims)
+
+
+    #np.save('/results/final_results/230111_mock/fitting_data/final_calcium_sims.npy', calcium_sims)
     plt.show()

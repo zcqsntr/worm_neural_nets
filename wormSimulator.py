@@ -42,7 +42,10 @@ class WormSimulator():
         std = 4
         if t_interval is None or t_interval[0] <= t <= t_interval[1]:
 
-            return self.gaussian(dist, mu=0, sig=std)*100
+            if t_interval is None:
+                return self.gaussian(dist, mu=0, sig=std)*100
+            else:
+                return self.gaussian(dist, mu=0, sig=std)*5
         else:
             return 0
 
@@ -103,7 +106,7 @@ class WormSimulator():
 
 
     def plot_sol(self, solution, save_path = None):
-        fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(25, 7.5))
+        fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(25, 7.5))
 
         t = np.arange(len(solution[0, :]))*self.dt
         # plot sensory neuron components
