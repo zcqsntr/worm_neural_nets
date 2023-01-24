@@ -1,5 +1,5 @@
 import numpy as np
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import os
 from scipy import stats
 from multiprocessing import Pool
@@ -8,15 +8,24 @@ from itertools import repeat
 
 class WormSimulator():
     def __init__(self, dataset, dt, t_span=[0,1200], y0=[0, 0, 0, 0, 0, 0, 0, 0]):
-        self.params =[4, 15, 2, 0.5, 0, 2, 0, 0, 0, 0.11, 2, -2, -2, -2, -2, 2, 2, False, None] # [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
+        self.params =[4, 15, 2, 0.5, 0, 2, 0, 0, 0, 0.11, 2, -2, -2, -2, -2, 2, 2, 1, -1, False, None] # [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
         self.dt = dt
         self.t_span = t_span  # s
         self.y0 = y0
         self.theta = np.random.random() * 2 * np.pi
         self.dataset = dataset
+        self.ms = np.mean(list(map(sum, self.dataset)))
+        self.ss = np.std(list(map(sum, self.dataset)))
+        self.sks = stats.skew(list(map(sum, self.dataset)))
+
+        self.mr = np.mean(list(map(lambda x: max(x) - min(x), self.dataset)))
+        self.sr = np.std(list(map(lambda x: max(x) - min(x), self.dataset)))
+        self.skr = stats.skew(list(map(lambda x: max(x) - min(x), self.dataset)))
         self.plate_r = 3
         self.origin = np.array([4.5, 0])
         self.domain =[-3,3]
+        self.sample_time = 0.1
+        self.last_sample = 0
 
     def gaussian(self, x, mu, sig):
         return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
@@ -43,7 +52,7 @@ class WormSimulator():
 
         AWC_v, AWC_f, AWC_s, AIB_v, AIA_v, AIY_v, x, y = X
 
-        AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, worm_trapped, conc_interval = p
+        AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7,w_8, w_9, worm_trapped, conc_interval = p
 
         conc = self.concentration_func(x, y, t, conc_interval)
 
@@ -67,8 +76,12 @@ class WormSimulator():
         if worm_trapped:
             dy = dx = 0
         else:
-
-            turn = (np.random.random() * 2 - 1) < np.tanh(AIB_v -AIY_v) # dt = sample_time so just make this decision every time
+            turn = False
+            if self.last_sample >= self.sample_time:
+                turn = (np.random.random() * 2 - 1) < np.tanh(w_8*AIB_v + w_9*AIY_v) # dt = sample_time so just make this decision every time
+                self.last_sample = 0
+            else:
+                self.last_sample += self.dt
 
             if turn:
                 self.theta = np.random.random() * 2 * np.pi
@@ -92,18 +105,19 @@ class WormSimulator():
     def plot_sol(self, solution, save_path = None):
         fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(25, 7.5))
 
+        t = np.arange(len(solution[0, :]))*self.dt
         # plot sensory neuron components
-        axs[0].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt), solution[1, :], label='AWC fast')
-        axs[0].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt), solution[2, :], label='AWC slow')
+        axs[0].plot(t, solution[1, :], label='AWC fast')
+        axs[0].plot(t, solution[2, :], label='AWC slow')
         axs[0].legend()
         axs[0].set_xlabel('Time (s)')
         axs[0].set_ylabel('Sensory neuron voltage')
 
         #plot neuron voltages
-        axs[1].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt),solution[0, :], label = 'AWC')
-        axs[1].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt),solution[3, :], label = 'AIB')
-        axs[1].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt),solution[4, :], label = 'AIA')
-        axs[1].plot(np.arange(self.t_span[0], self.t_span[1] + 2*self.dt, self.dt),solution[5, :], label = 'AIY')
+        axs[1].plot(t,solution[0, :], label = 'AWC')
+        axs[1].plot(t,solution[3, :], label = 'AIB')
+        axs[1].plot(t,solution[4, :], label = 'AIA')
+        axs[1].plot(t,solution[5, :], label = 'AIY')
         axs[1].legend()
         axs[1].set_xlabel('Time (s)')
         axs[1].set_ylabel('Neuron voltages')
@@ -205,34 +219,7 @@ class WormSimulator():
 
         return sectors
 
-    def get_fitness(self, weights, n_worms):
-
-        ms = np.mean(list(map(sum, self.dataset)))
-        ss = np.std(list(map(sum, self.dataset)))
-        sks = stats.skew(list(map(sum, self.dataset)))
-
-        mr = np.mean(list(map(lambda x: max(x) - min(x), self.dataset)))
-        sr = np.std(list(map(lambda x: max(x) - min(x), self.dataset)))
-        skr = stats.skew(list(map(lambda x: max(x) - min(x), self.dataset)))
-
-
-        params = self.params
-
-        # positive weights
-        params[10] = weights[0]
-        params[15] = weights[1]
-        params[16] = weights[2]
-
-        # negative weights
-        params[11] = weights[3]
-        params[12] = weights[4]
-        params[13] = weights[5]
-        params[14] = weights[6]
-
-        sectors = self.run_experiment(params, n_worms)
-
-
-
+    def fitness_from_sectors(self, sectors):
         mean_score = np.mean(list(map(sum, sectors)))
         std_score = np.std(list(map(sum, sectors)))
         skew_score = stats.skew(list(map(sum, sectors)))
@@ -240,8 +227,31 @@ class WormSimulator():
         std_range = np.std(list(map(lambda x: max(x) - min(x), sectors)))
         skew_range = stats.skew(list(map(lambda x: max(x) - min(x), sectors)))
 
+        fitness = - (abs(mean_score - self.ms) + abs(mean_range - self.mr) + abs(std_score - self.ss) + abs(std_range - self.sr) + abs(
+            skew_score - self.sks) + abs(skew_range - self.skr))
 
-        fitness = - (abs(mean_score - ms) + abs(mean_range - mr) + abs(std_score - ss) + abs(std_range - sr) + abs(skew_score - sks) + abs(skew_range - skr))
+        return fitness
+
+    def get_fitness(self, weights, n_worms):
+
+        params = self.params
+
+        # positive weights
+        params[10] = weights[0]
+        params[15] = weights[1]
+        params[16] = weights[2]
+        params[17] = weights[3]
+
+        # negative weights
+        params[11] = weights[4]
+        params[12] = weights[5]
+        params[13] = weights[6]
+        params[14] = weights[7]
+        params[18] = weights[8]
+
+        sectors = self.run_experiment(params, n_worms)
+        fitness = self.fitness_from_sectors(sectors)
+
         #print((abs(mean_score - ms), abs(mean_range - mr), abs(std_score - ss),abs(std_range - sr),abs(skew_score - sks),abs(skew_range - skr)))
         return fitness
 
@@ -261,7 +271,7 @@ class WormSimulator():
             '''
             fitnesses.append(fitness)
 
-
+        print('done')
         return fitnesses
 
     def get_fitnesses_par(self, population, n_worms):
@@ -272,21 +282,21 @@ class WormSimulator():
 
         return fitnesses
 
-    def run_experiment_wrapper(self, p, n_worms):
+    def run_experiment_wrapper(self, weights, n_worms):
         params = self.params
 
         # positive weights
-        params[10] = p[0]
-        params[15] = p[1]
-        params[16] = p[2]
-        params[17] = p[3]
+        params[10] = weights[0]
+        params[15] = weights[1]
+        params[16] = weights[2]
+        params[17] = weights[3]
 
         # negative weights
-        params[11] = p[4]
-        params[12] = p[5]
-        params[13] = p[6]
-        params[14] = p[7]
-        params[18] = p[8]
+        params[11] = weights[4]
+        params[12] = weights[5]
+        params[13] = weights[6]
+        params[14] = weights[7]
+        params[18] = weights[8]
 
         sectors = self.run_experiment(params, n_worms)
         return sectors

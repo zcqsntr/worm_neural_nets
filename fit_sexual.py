@@ -36,12 +36,22 @@ def param_scan(simulator, start, stop, step, save_path = './working_dir/param_sc
 
 
 
-def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/evolution_constrained'):
+def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/sexual'):
 
 
 
-    population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_aversive/221216_evolution_constrained/gen192/population.npy')
+    #population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_aversive/221216_evolution_constrained/gen192/population.npy')
+    pos = np.random.random(size=(pop_size, 3)) * 20 - 10
+    neg = np.random.random(size=(pop_size, 4)) * 20 - 10
 
+    if fit_w8_w9:
+        w_8 = np.random.random(size=(pop_size, 1)) * 20 - 10
+        w_9 = np.random.random(size=(pop_size, 1)) * 20 - 10
+    else:
+        w_8 = np.ones((pop_size, 1))
+        w_9 = -np.ones((pop_size, 1))
+
+    population = np.hstack((pos, w_8, neg, w_9))
 
     fitnesses = simulator.get_fitnesses_par(population, n_worms)
     for i in range(n_gens):
@@ -58,9 +68,20 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/e
         population = population[order]
 
 
-        population[int(pop_size*0.5):] = population[:int(pop_size*0.5)] + np.random.random(size = ( int(pop_size*0.5), 9)) - 0.5
+        #population[int(pop_size*0.5):] = population[:int(pop_size*0.5)] + np.random.random(size = ( int(pop_size*0.5), 9)) - 0.5
 
-        fitnesses[int(pop_size*0.5):] = simulator.get_fitnesses_par(population[int(pop_size*0.5):], n_worms)
+        #fitnesses[int(pop_size*0.5):] = simulator.get_fitnesses_par(population[int(pop_size*0.5):], n_worms)
+
+        population[int(pop_size * 0.4): int(pop_size * 0.8)] += np.random.random(
+            size=(int(pop_size * 0.8) - int(pop_size * 0.4), 9)) * 2 - 1.
+
+        population[int(pop_size * 0.8):, :] = np.random.random(size=(pop_size - int(pop_size * 0.8), 9)) * 20 - 10
+
+        if not fit_w8_w9:
+            population[:, 3] = 1
+            population[:, 8] = -1
+
+        fitnesses[int(pop_size * 0.4):] = simulator.get_fitnesses_par(population[int(pop_size * 0.4):], n_worms)
 
         print('gen', i)
         print('max: ', np.max(fitnesses), population[0])
@@ -69,9 +90,9 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/e
 
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
 print([len(x) for x in [no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour]])
-n_gens = 1000
+n_gens = 100
 pop_size = 100
-n_worms = 304 # number of worms in each experiment
+
 
 
 # starting params from gosh et al
@@ -89,7 +110,8 @@ w_8 = 0.5
 w_9 = -0.5
 dataset = sex_odour
 print(len(dataset))
-simulator = WormSimulator(dataset = dataset, dt = 0.1)
+n_worms = len(dataset)
+simulator = WormSimulator(dataset = dataset, dt = 0.005)
 
 
 
@@ -100,7 +122,7 @@ simulator = WormSimulator(dataset = dataset, dt = 0.1)
 
 
 
-opt = 'C'
+opt = 'P'
 #sol = forward_euler(y0, parameters, dt, t_span[-1])
 
 
@@ -111,11 +133,17 @@ opt = 'C'
 
 worm_trapped = False
 conc_interval = None
+fit_w8_w9 = False
 
 params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
           speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
-path = '/home/neythen/Desktop/Projects/worm_neural_nets/working_dir/evolution_constrained/'
+path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_sexual/231501_evolution_constrained/gen99/'
+
+'''
+max:  -2.2976276924854786 [  1.59345591  -2.45687129  -3.98536621   1.          -5.47492077
+  -7.92269622 -10.59328052  10.7723366   -1.        ]
+'''
 
 if opt == 'E': # evolve
     evolve_constraints(simulator, n_gens, pop_size)
@@ -128,8 +156,8 @@ elif opt == 'P':  # plot
 
     all_sectors = []
 
-    all_sectors = simulator.run_experiment_par(population[0:25], n_worms)
-
+    all_sectors = simulator.run_experiment_par(population, n_worms)
+    np.save(path + 'all_sectors.npy', all_sectors)
     ncols = 5
     fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
 
@@ -142,7 +170,7 @@ elif opt == 'P':  # plot
     for i, sectors in enumerate(all_sectors):
 
         ax = axs[i // ncols, i  % ncols]
-        ax.violinplot([sum(s) for s in sectors])
+
 
         ax.set_ylim(bottom=-6.1, top=6.1)
 
@@ -207,7 +235,11 @@ elif opt == 'S': # simulate
     params[14] = p[7]
     params[18] = p[8]
 
+    t = time.time()
+
     sol = simulator.forward_euler(simulator.y0, params)
+
+    print(time.time()- t)
 
     print(simulator.score_worm(sol))
 

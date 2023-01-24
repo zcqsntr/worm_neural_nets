@@ -35,12 +35,22 @@ def param_scan(simulator, start, stop, step, save_path = './working_dir/param_sc
         plt.show()
 
 
-def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/evolution_constrained'):
+def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/aversive'):
 
 
 
-    population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/221214_fit_constrained/gen144/population.npy')
+    #population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/230111_evolution_constrained/gen99/population.npy')
+    pos = np.random.random(size=(pop_size, 3)) * 20 - 10
+    neg = np.random.random(size=(pop_size, 4)) * 20 - 10
 
+    if fit_w8_w9:
+        w_8 = np.random.random((pop_size, 1)) * 20 -10
+        w_9 = np.random.random(size=(pop_size, 1)) * 20-10
+    else:
+        w_8 = np.ones((pop_size, 1))
+        w_9 = -np.ones((pop_size, 1))
+
+    population = np.hstack((pos, w_8, neg, w_9))
 
     fitnesses = simulator.get_fitnesses_par(population, n_worms)
     for i in range(n_gens):
@@ -57,9 +67,20 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/e
         population = population[order]
 
 
-        population[int(pop_size*0.5):] = population[:int(pop_size*0.5)] + np.random.random(size = ( int(pop_size*0.5), 9)) - 0.5
+        #population[int(pop_size*0.5):] = population[:int(pop_size*0.5)] + np.random.random(size = ( int(pop_size*0.5), 9)) - 0.5
 
-        fitnesses[int(pop_size*0.5):] = simulator.get_fitnesses_par(population[int(pop_size*0.5):], n_worms)
+        #fitnesses[int(pop_size*0.5):] = simulator.get_fitnesses_par(population[int(pop_size*0.5):], n_worms)
+
+        population[int(pop_size * 0.4): int(pop_size * 0.8)] += np.random.random(size=(int(pop_size * 0.8) - int(pop_size * 0.4), 9)) * 2 - 1.
+
+        population[int(pop_size * 0.8):, :] = np.random.random(size=(pop_size - int(pop_size * 0.8), 9)) * 20 - 10
+
+        if not fit_w8_w9:
+            population[:, 3] = 1
+            population[:, 8] = -1
+
+
+        fitnesses[int(pop_size * 0.4):] = simulator.get_fitnesses_par(population[int(pop_size * 0.4):], n_worms)
 
         print('gen', i)
         print('max: ', np.max(fitnesses), population[0])
@@ -70,9 +91,11 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/e
 
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
 
-n_gens = 1000
+n_gens = 100
 pop_size = 100
-n_worms = 271 # number of worms in each experiment
+dataset = aversive_odour
+print(len(dataset))
+n_worms = len(dataset) # number of worms in each experiment
 
 
 # starting params from gosh et al
@@ -86,11 +109,10 @@ speed = 0.11 #mm/s
 
 w_2 = w_3 = w_4 = w_5  = -2 # -ve weights
 w_1 = w_6 = w_7 = 2 # +ve weights
-w_8 = 0.5
-w_9 = -0.5
-dataset = aversive_odour
-print(len(dataset))
-simulator = WormSimulator(dataset = dataset, dt = 0.1)
+w_8 = 1
+w_9 = -1
+
+simulator = WormSimulator(dataset = dataset, dt = 0.005)
 
 
 
@@ -111,25 +133,34 @@ opt = 'C'
 
 worm_trapped = False
 conc_interval = None
+fit_w8_w9 = False
 
 params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
           speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
-path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_aversive/221216_evolution_constrained/'
-
+path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_aversive/230116_aversive/gen99/'
+'''
+max:  -1.2449320222615108 [ 2.88911244 -3.63632838 -0.06456711  1.          4.01216015  9.11383075
+ -1.82794145 -6.02636742 -1.        ]
+'''
+t = time.time()
 if opt == 'E': # evolve
     evolve_constraints(simulator, n_gens, pop_size)
 elif opt == 'P':  # plot
-    population = np.load(path + 'population.npy')
-    fitnesses = np.load(path + 'fitnesses.npy')
+
+    population = np.load(path + '/population.npy')
+    fitnesses = np.load(path + '/fitnesses.npy')
 
     order = np.argsort(fitnesses)[::-1]
+    
     population = population[order]
+
 
     all_sectors = []
 
-    all_sectors = simulator.run_experiment_par(population[0:25], n_worms)
+    all_sectors = simulator.run_experiment_par(population, n_worms)
 
+    np.save(path + 'all_sectors.npy', all_sectors)
     ncols = 5
     fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
 
@@ -142,7 +173,7 @@ elif opt == 'P':  # plot
     for i, sectors in enumerate(all_sectors):
 
         ax = axs[i // ncols, i  % ncols]
-        ax.violinplot([sum(s) for s in sectors])
+
 
         ax.set_ylim(bottom=-6.1, top=6.1)
 
@@ -163,7 +194,6 @@ elif opt == 'P':  # plot
           np.mean(list(map(lambda x: max(x) - min(x), sectors))), 'range std',
           np.std(list(map(lambda x: max(x) - min(x), sectors))))
 
-    plt.show()
 
 elif opt == 'T': # test
     n_worms = 1000
@@ -184,9 +214,9 @@ elif opt == 'T': # test
 
 elif opt == 'S': # simulate
     population = np.load(
-        path + 'population.npy')
+        path + '/population.npy')
 
-    fitnesses = np.load(path + 'fitnesses.npy')
+    fitnesses = np.load(path + '/fitnesses.npy')
 
     order = np.argsort(fitnesses)[::-1]
     population = population[order]
@@ -213,7 +243,6 @@ elif opt == 'S': # simulate
 
     simulator.plot_sol(sol)
 
-    plt.show()
 
 elif opt == 'C': # test worm in the calcium imaging experiment
     worm_trapped = True
@@ -223,7 +252,9 @@ elif opt == 'C': # test worm in the calcium imaging experiment
               speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
     population = np.load(
-        path + 'population.npy')
+        path + '/population.npy')
+
+
     ncols = 5
     fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
     for i in range(25):
@@ -254,4 +285,7 @@ elif opt == 'C': # test worm in the calcium imaging experiment
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Neuron voltages')
         # simulator.plot_conc()
-    plt.show()
+
+print('time', time.time() - t)
+
+plt.show()

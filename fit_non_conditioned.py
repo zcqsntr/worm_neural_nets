@@ -36,12 +36,19 @@ def param_scan(simulator, start, stop, step, save_path = dir_path + '/working_di
     if plot:
         plt.show()
 
-def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/working_dir/evolution_constrained'):
+def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/working_dir/non_cond'):
 
     pos = np.random.random(size = (pop_size, 3))*10 # population of positive weights
     neg = np.random.random(size = (pop_size, 4))*-10  # population of negative weights
 
-    population = np.hstack((pos, neg))
+    if fit_w8_w9:
+        w_8 = np.random.random(size=(pop_size, 1)) * 10
+        w_9 = np.random.random(size=(pop_size, 1)) * 10
+    else:
+        w_8 = np.ones(size=(pop_size, 1))
+        w_9 = -np.ones(size=(pop_size, 1))
+
+    population = np.hstack((pos,w_8, neg, w_9))
 
 
     fitnesses = simulator.get_fitnesses_par(population, n_worms)
@@ -59,13 +66,22 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/wor
         population = population[order]
 
 
-        population[int(pop_size*0.4): int(pop_size*0.8)] += np.random.random(size = (int(pop_size*0.8)- int(pop_size*0.4), 7))*2 - 1.
-        population[int(pop_size*0.4): int(pop_size*0.8), 0:3][population[int(pop_size*0.4): int(pop_size*0.8), 0:3] < 0] = 0
-        population[int(pop_size*0.4): int(pop_size*0.8), 3:7][population[int(pop_size*0.4): int(pop_size*0.8), 3:7] > 0] = 0
+
+        population[int(pop_size * 0.4): int(pop_size * 0.8)] += np.random.random(size=(int(pop_size * 0.8) - int(pop_size * 0.4), 9)) * 2 - 1.
+
+        population[int(pop_size * 0.4): int(pop_size * 0.8), 0:4][population[int(pop_size * 0.4): int(pop_size * 0.8), 0:4] < 0] = 0
+        population[int(pop_size * 0.4): int(pop_size * 0.8), 4:9][population[int(pop_size * 0.4): int(pop_size * 0.8), 4:9] > 0] = 0
+
+        population[int(pop_size * 0.8):, 0:4] = np.random.random(size=(pop_size - int(pop_size * 0.8), 4)) * 10
+        population[int(pop_size * 0.8):, 4:9] = np.random.random(size=(pop_size - int(pop_size * 0.8), 5)) * -10
+
+        if not fit_w8_w9:
+            population[:, 3] = 1
+            population[:, 8] = -1
 
 
-        population[int(pop_size*0.8): , 0:3] = np.random.random(size = (pop_size-int(pop_size*0.8), 3))*10
-        population[int(pop_size*0.8): , 3:7] = np.random.random(size = (pop_size-int(pop_size*0.8), 4))*-10
+
+
 
         fitnesses[int(pop_size*0.4):] = simulator.get_fitnesses_par(population[int(pop_size*0.4):], n_worms)
 
@@ -97,27 +113,25 @@ speed = 0.11 #mm/s
 
 w_1 = w_6 = w_7 = 1.5 # +ve weights
 w_2 = w_3 = w_4 = w_5  = -1.5 # -ve weights
+w_8 = 1
+w_9 = -1
 
 
 
-simulator = WormSimulator(dataset = dataset, dt = 0.1)
+simulator = WormSimulator(dataset = dataset, dt = 0.005)
 worm_trapped = False
 conc_interval = None
+fit_w8_w9 = True
 
 params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, worm_trapped, conc_interval]
+          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
 #sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
 
-opt = 'E'
+opt = 'S'
 
 
-
-
-
-
-
-path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/221214_fit_constrained/'
+path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/worm_simulation_results_NT/230111_mock/fitting_output/'
 
 if opt == 'E': # evolve
     evolve_constraints(simulator, n_gens, pop_size)
@@ -125,15 +139,15 @@ elif opt == 'P':  # plot
     population = np.load(path + 'population.npy')
     fitnesses = np.load(path + 'fitnesses.npy')
 
-    print(population[0:10])
+    print(population.shape)
 
     order = np.argsort(fitnesses)[::-1]
     population = population[order]
 
     all_sectors = []
 
-    all_sectors = simulator.run_experiment_par(population[0:25], n_worms)
-
+    all_sectors = simulator.run_experiment_par(population, n_worms)
+    np.save(path + 'all_sectors.npy', all_sectors)
     ncols = 5
     fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
 
@@ -146,7 +160,7 @@ elif opt == 'P':  # plot
     for i, sectors in enumerate(all_sectors):
 
         ax = axs[i // ncols, i  % ncols]
-        ax.violinplot([sum(s) for s in sectors])
+
 
         ax.set_ylim(bottom=-6.1, top=6.1)
 
@@ -188,27 +202,27 @@ elif opt == 'T': # test
 
 elif opt == 'S': # simulate
     population = np.load(
-        path + 'population.npy')
+        path + '/weights_population.npy')
 
-    fitnesses = np.load(path + 'fitnesses.npy')
+    fitnesses = np.load(path + '/final_fitnesses.npy')
 
     order = np.argsort(fitnesses)[::-1]
     population = population[order]
 
-    p = population[0]
-    print(p)
-
+    weights = population[0]
 
     # positive weights
-    params[10] = p[0]
-    params[15] = p[1]
-    params[16] = p[2]
+    params[10] = weights[0]
+    params[15] = weights[1]
+    params[16] = weights[2]
+    params[17] = weights[3]
 
     # negative weights
-    params[11] = p[4]
-    params[12] = p[5]
-    params[13] = p[6]
-    params[14] = p[7]
+    params[11] = weights[4]
+    params[12] = weights[5]
+    params[13] = weights[6]
+    params[14] = weights[7]
+    params[18] = weights[8]
 
     sol = simulator.forward_euler(simulator.y0, params)
 
@@ -225,28 +239,35 @@ elif opt == 'C': # test worm in the calcium imaging experiment
     params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
               speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
-    population = np.load(
-        path + 'population.npy')
+    #population = np.load(path + 'gen99/population.npy')
+
+    population = np.load('/results/final_results/230111_mock/fitting_data/weights_population.npy')
     ncols = 5
     fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
-    for i in range(25):
-        p = population[i]
+    calcium_sims = []
+
+    for i in range(len(population)):
+        weights = population[i]
 
         # positive weights
-        params[10] = p[0]
-        params[15] = p[1]
-        params[16] = p[2]
+        params[10] = weights[0]
+        params[15] = weights[1]
+        params[16] = weights[2]
+        params[17] = weights[3]
 
         # negative weights
-        params[11] = p[4]
-        params[12] = p[5]
-        params[13] = p[6]
-        params[14] = p[7]
+        params[11] = weights[4]
+        params[12] = weights[5]
+        params[13] = weights[6]
+        params[14] = weights[7]
+        params[18] = weights[8]
 
         simulator.t_span[-1] = max_t
         solution = simulator.forward_euler(simulator.y0, params)
+        calcium_sims.append(solution)
 
         # plot neuron voltages
+        '''
         ax = axs[i // ncols, i  % ncols]
         ax.plot(np.arange(0, max_t, simulator.dt), solution[0, 1:-1], label='AWC')
         ax.plot(np.arange(0, max_t, simulator.dt), solution[3, 1:-1], label='AIB')
@@ -254,5 +275,9 @@ elif opt == 'C': # test worm in the calcium imaging experiment
         ax.legend()
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Neuron voltages')
+        '''
+
         #simulator.plot_conc()
+
+    np.save('/results/final_results/230111_mock/fitting_data/final_calcium_sims.npy', calcium_sims)
     plt.show()
