@@ -153,7 +153,7 @@ dataset = no_cond_odour
 print(len(dataset))
 n_worms = len(dataset)# number of worms in each experiment
 
-
+n_worms = 2
 
 w_1 = w_6 = w_7 = 1.5 # +ve weights
 w_2 = w_3 = w_4 = w_5  = -1.5 # -ve weights
@@ -168,10 +168,10 @@ conc_interval = None
 fit_w8_w9 = True
 
 
-opt = 'S'
+opt = 'scan'
 
 
-path = './results/worm_simulation_results_NT/230116_aversive/fitting_output/'
+path = './results/worm_simulation_results_NT/230111_mock/fitting_output/'
 
 if opt == 'E': # evolve
     evolve_constraints(simulator, n_gens, pop_size)
@@ -227,17 +227,18 @@ elif opt == 'P':  # plot
 elif opt == 'scan':  # quick param scan after arantza's email
     starting_w1 = np.load(path + 'weights_population.npy')[2]
     starting_w2 = np.load(path + 'weights_population.npy')[15]
-    starting_weights = np.append(starting_w1, starting_w2)
-    print(starting_weights)
+
 
     all_test_weights = []
-    for w_1 in range(-10, 11, 2):
 
-        for w_3 in range(-10, 11, 2):
-            test_weights = copy.deepcopy(starting_weights)
-            test_weights[0] = w_1
-            test_weights[2] = w_3
-            all_test_weights.append(test_weights)
+    for starting_weights in [starting_w1, starting_w2]:
+        for w_1 in range(-10, 11, 2):
+
+            for w_3 in range(-10, 11, 2):
+                test_weights = copy.deepcopy(starting_weights)
+                test_weights[0] = w_1
+                test_weights[2] = w_3
+                all_test_weights.append(test_weights)
     print(len(all_test_weights))
     all_sectors = simulator.run_experiment_par(all_test_weights, n_worms)
     np.save(path + 'param_scan/all_sectors.npy', all_sectors)
