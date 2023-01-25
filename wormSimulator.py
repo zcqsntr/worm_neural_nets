@@ -152,7 +152,7 @@ class WormSimulator():
         axs[2].plot(solution[6,:], solution[7,:])
         axs[2].scatter(solution[6,0], solution[7,0], label = 'start')
         axs[2].scatter(solution[6,-1], solution[7,-1], label = 'end')
-        axs[2].set_box_aspect(1)
+        #axs[2].set_box_aspect(1)
 
 
         axs[2].set_xlim(self.domain[0], self.domain[1])
@@ -279,16 +279,12 @@ class WormSimulator():
 
         return fitnesses
 
-    def run_experiment_wrapper(self, weights, n_worms):
-
-        sectors = self.run_experiment(weights, n_worms)
-        return sectors
 
     def run_experiment_par(self, weights_population, n_worms):
         n_cores = int(mp.cpu_count())
 
         with Pool(n_cores) as pool:
-            sectors = pool.starmap(self.run_experiment_wrapper, zip(weights_population, repeat(n_worms)))
+            sectors = pool.starmap(self.run_experiment, zip(weights_population, repeat(n_worms)))
 
         return sectors
 

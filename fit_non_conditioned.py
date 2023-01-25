@@ -154,15 +154,6 @@ print(len(dataset))
 n_worms = len(dataset)# number of worms in each experiment
 
 
-# starting params from gosh et al
-tm = 0.5 #s
-AIB_v0 = AIA_v0 = AIY_v0 = AWC_v0 = 0
-AWC_gain = 2
-AWC_f_a = 4 #1/s
-AWC_f_b = 15 #1/s
-AWC_s_gamma = 2 #1/s
-speed = 0.11 #mm/s
-
 
 w_1 = w_6 = w_7 = 1.5 # +ve weights
 w_2 = w_3 = w_4 = w_5  = -1.5 # -ve weights
@@ -176,14 +167,11 @@ worm_trapped = False
 conc_interval = None
 fit_w8_w9 = True
 
-params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-          speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
-
 
 opt = 'S'
 
 
-path = '/Users/neythen/Desktop/Projects/worm_neural_networks/results/worm_simulation_results_NT/230111_mock/fitting_output/'
+path = './results/worm_simulation_results_NT/230116_aversive/fitting_output/'
 
 if opt == 'E': # evolve
     evolve_constraints(simulator, n_gens, pop_size)
@@ -237,10 +225,10 @@ elif opt == 'P':  # plot
     plt.show()
 
 elif opt == 'scan':  # quick param scan after arantza's email
-    starting_w1= np.load(path + 'weights_population.npy')[2]
-    starting_w2= np.load(path + 'weights_population.npy')[15]
+    starting_w1 = np.load(path + 'weights_population.npy')[2]
+    starting_w2 = np.load(path + 'weights_population.npy')[15]
     starting_weights = np.append(starting_w1, starting_w2)
-
+    print(starting_weights)
 
     all_test_weights = []
     for w_1 in range(-10, 11, 2):
@@ -251,45 +239,23 @@ elif opt == 'scan':  # quick param scan after arantza's email
             test_weights[2] = w_3
             all_test_weights.append(test_weights)
     print(len(all_test_weights))
-    #all_sectors = simulator.run_experiment_par(all_test_weights, n_worms)
-    #np.save(path + 'all_sectors.npy', all_sectors)
+    all_sectors = simulator.run_experiment_par(all_test_weights, n_worms)
+    np.save(path + 'param_scan/all_sectors.npy', all_sectors)
 
     worm_trapped = True
     conc_interval = [10, 40]
     max_t = 70
-    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-              speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
-
-
     calcium_sims = []
 
     for i in range(len(all_test_weights)):
         print(i)
         weights = all_test_weights[i]
 
-        # positive weights
-        params[10] = weights[0]
-        params[15] = weights[1]
-        params[16] = weights[2]
-        params[17] = weights[3]
-
-        # negative weights
-        params[11] = weights[4]
-        params[12] = weights[5]
-        params[13] = weights[6]
-        params[14] = weights[7]
-        params[18] = weights[8]
 
         simulator.t_span[-1] = max_t
-        solution = simulator.forward_euler(simulator.y0, params)
+        solution = simulator.forward_euler(simulator.y0, weights)
         calcium_sims.append(solution)
-    np.save(path + 'calcium_sims.npy', calcium_sims)
-
-
-
-
-
-
+    np.save(path + 'param_scan/calcium_sims.npy', calcium_sims)
 
 
 
@@ -302,11 +268,7 @@ elif opt == 'S': # simulate
     order = np.argsort(fitnesses)[::-1]
     population = population[order]
 
-    weights = population[0]
-
-    print(weights)
-
-
+    weights = copy.deepcopy(population[0])
 
     sol = simulator.forward_euler(simulator.y0, weights)
 
