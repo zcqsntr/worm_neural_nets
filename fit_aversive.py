@@ -122,7 +122,7 @@ simulator = WormSimulator(dataset = dataset, dt = 0.005)
 
 
 
-opt = 'C'
+opt = 'S'
 #sol = forward_euler(y0, parameters, dt, t_span[-1])
 
 
@@ -138,7 +138,7 @@ fit_w8_w9 = False
 params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
           speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
-path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/worm_simulation_results_NT/230116_aversive/fitting_output/'
+path = '/Users/neythen/Desktop/Projects/worm_neural_networks/results/worm_simulation_results_NT/230116_aversive/fitting_output'
 '''
 max:  -1.2449320222615108 [ 2.88911244 -3.63632838 -0.06456711  1.          4.01216015  9.11383075
  -1.82794145 -6.02636742 -1.        ]

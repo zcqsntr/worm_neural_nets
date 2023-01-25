@@ -128,10 +128,10 @@ params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, A
 
 #sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
 
-opt = 'scan'
+opt = 'S'
 
 
-path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/worm_simulation_results_NT/230111_mock/fitting_output/'
+path = '/Users/neythen/Desktop/Projects/worm_neural_networks/results/worm_simulation_results_NT/230111_mock/fitting_output/'
 
 if opt == 'E': # evolve
     evolve_constraints(simulator, n_gens, pop_size)
@@ -187,7 +187,7 @@ elif opt == 'P':  # plot
 elif opt == 'scan':  # quick param scan after arantza's email
     starting_weights = np.load(path + 'weights_population.npy')[0]
 
-    print(starting_weights)
+
     all_test_weights = []
     for w_1 in range(-10, 11, 2):
 
@@ -197,23 +197,44 @@ elif opt == 'scan':  # quick param scan after arantza's email
             test_weights[8] = w_9
             all_test_weights.append(test_weights)
     print(len(all_test_weights))
-    all_sectors = simulator.run_experiment_par(all_test_weights, n_worms)
-    np.save(path + 'all_sectors.npy', all_sectors)
+    #all_sectors = simulator.run_experiment_par(all_test_weights, n_worms)
+    #np.save(path + 'all_sectors.npy', all_sectors)
 
-    ncols = 10
-    fig, axs = plt.subplots(nrows=13, ncols=ncols, figsize=(15, 7.5))
+    worm_trapped = True
+    conc_interval = [10, 40]
+    max_t = 70
+    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
+              speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
-    for i, sectors in enumerate(all_sectors):
-        ax = axs[i // ncols, i % ncols]
 
-        ax.set_ylim(bottom=-6.1, top=6.1)
+    calcium_sims = []
 
-        ax.violinplot(list(map(sum, dataset)))
-        ax.violinplot(list(map(sum, sectors)))
+    for i in range(len(all_test_weights)):
+        print(i)
+        weights = all_test_weights[i]
 
-    fig.suptitle('Violin plots')
-    plt.savefig('violin_plots.pdf')
-    plt.show()
+        # positive weights
+        params[10] = weights[0]
+        params[15] = weights[1]
+        params[16] = weights[2]
+        params[17] = weights[3]
+
+        # negative weights
+        params[11] = weights[4]
+        params[12] = weights[5]
+        params[13] = weights[6]
+        params[14] = weights[7]
+        params[18] = weights[8]
+
+        simulator.t_span[-1] = max_t
+        solution = simulator.forward_euler(simulator.y0, params)
+        calcium_sims.append(solution)
+    np.save(path + 'calcium_sims.npy', calcium_sims)
+
+
+
+
+
 
 
 

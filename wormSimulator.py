@@ -117,10 +117,13 @@ class WormSimulator():
         axs[0].set_ylabel('Sensory neuron voltage')
 
         #plot neuron voltages
-        axs[1].plot(t,solution[0, :], label = 'AWC')
-        axs[1].plot(t,solution[3, :], label = 'AIB')
-        axs[1].plot(t,solution[4, :], label = 'AIA')
-        axs[1].plot(t,solution[5, :], label = 'AIY')
+        alpha = 0.5
+        lw = 1
+        axs[1].plot(t, solution[0, :], label='AWC', alpha=alpha, lw=lw)
+        axs[1].plot(t, solution[3, :], label='AIB', alpha=alpha, lw=lw)
+        axs[1].plot(t, solution[5, :], label='AIY', alpha=alpha, lw=lw)
+        # axs[1].plot(t, solution[5, 1:-1], label='AIA', alpha = alpha, lw = lw) #uncomment this line to plot AIA
+
         axs[1].legend()
         axs[1].set_xlabel('Time (s)')
         axs[1].set_ylabel('Neuron voltages')
@@ -147,6 +150,7 @@ class WormSimulator():
         axs[2].plot(solution[6,:], solution[7,:])
         axs[2].scatter(solution[6,0], solution[7,0], label = 'start')
         axs[2].scatter(solution[6,-1], solution[7,-1], label = 'end')
+        axs[2].set_box_aspect(1)
 
 
         axs[2].set_xlim(self.domain[0], self.domain[1])
