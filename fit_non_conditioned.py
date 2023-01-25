@@ -228,16 +228,17 @@ elif opt == 'scan':  # quick param scan after arantza's email
     starting_w1 = np.load(path + 'weights_population.npy')[2]
     starting_w2 = np.load(path + 'weights_population.npy')[15]
 
+    print(starting_w1, starting_w2)
 
     all_test_weights = []
 
     for starting_weights in [starting_w1, starting_w2]:
-        for w_1 in range(-10, 11, 2):
+        for dw_1 in range(-10, 11, 2):
 
-            for w_3 in range(-10, 11, 2):
+            for dw_3 in range(-10, 11, 2):
                 test_weights = copy.deepcopy(starting_weights)
-                test_weights[0] = w_1
-                test_weights[2] = w_3
+                test_weights[0] -= w_1
+                test_weights[2] -= w_3
                 all_test_weights.append(test_weights)
     print(len(all_test_weights))
     all_sectors = simulator.run_experiment_par(all_test_weights, n_worms)
