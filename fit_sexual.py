@@ -41,8 +41,8 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/s
 
 
     #population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_aversive/221216_evolution_constrained/gen192/population.npy')
-    pos = np.random.random(size=(pop_size, 3)) * 20 - 10
-    neg = np.random.random(size=(pop_size, 4)) * 20 - 10
+    rand = np.random.random(size=(pop_size, 7)) * 20 - 10
+
 
     if fit_w8_w9:
         w_8 = np.random.random(size=(pop_size, 1)) * 20 - 10
@@ -51,7 +51,7 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/s
         w_8 = np.ones((pop_size, 1))
         w_9 = -np.ones((pop_size, 1))
 
-    population = np.hstack((pos, w_8, neg, w_9))
+    population = np.hstack((rand, w_8, w_9))
 
     fitnesses = simulator.get_fitnesses_par(population, n_worms)
     for i in range(n_gens):

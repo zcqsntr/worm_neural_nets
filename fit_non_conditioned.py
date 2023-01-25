@@ -38,8 +38,6 @@ def param_scan(simulator, start, stop, step, save_path = dir_path + '/working_di
 
 def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/working_dir/non_cond'):
 
-    pos = np.random.random(size = (pop_size, 3))*10 # population of positive weights
-    neg = np.random.random(size = (pop_size, 4))*-10  # population of negative weights
 
     if fit_w8_w9:
         w_8 = np.random.random(size=(pop_size, 1)) * 10
@@ -48,7 +46,9 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/wor
         w_8 = np.ones(size=(pop_size, 1))
         w_9 = -np.ones(size=(pop_size, 1))
 
-    population = np.hstack((pos,w_8, neg, w_9))
+    w_signs = np.array([1,-1,-1,-1,-1,1,1,1,-1])
+
+    population = np.hstack([np.random.random(size = (pop_size, 1))*10 *w for w in w_signs],  w_8,  w_9)
 
 
     fitnesses = simulator.get_fitnesses_par(population, n_worms)
@@ -69,11 +69,14 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/wor
 
         population[int(pop_size * 0.4): int(pop_size * 0.8)] += np.random.random(size=(int(pop_size * 0.8) - int(pop_size * 0.4), 9)) * 2 - 1.
 
-        population[int(pop_size * 0.4): int(pop_size * 0.8), 0:4][population[int(pop_size * 0.4): int(pop_size * 0.8), 0:4] < 0] = 0
-        population[int(pop_size * 0.4): int(pop_size * 0.8), 4:9][population[int(pop_size * 0.4): int(pop_size * 0.8), 4:9] > 0] = 0
+        # set weights to 0 if they break the sign constraints
+        population[int(pop_size * 0.4): int(pop_size * 0.8), :][population[int(pop_size * 0.4): int(pop_size * 0.8), :] * w_signs < 0] = 0
 
-        population[int(pop_size * 0.8):, 0:4] = np.random.random(size=(pop_size - int(pop_size * 0.8), 4)) * 10
-        population[int(pop_size * 0.8):, 4:9] = np.random.random(size=(pop_size - int(pop_size * 0.8), 5)) * -10
+
+        population[int(pop_size * 0.8):,:] = np.hstack([np.random.random(size = (pop_size - int(pop_size * 0.8), 1))*10*w for w in w_signs],  w_8,  w_9)
+
+
+
 
         if not fit_w8_w9:
             population[:, 3] = 1
@@ -89,6 +92,56 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/wor
         print('max: ', np.max(fitnesses), population[0])
         print('mean: ', np.mean(fitnesses))
 
+def evolve(simulator, n_gens, pop_size, save_path = './working_dir/aversive'):
+
+
+
+    #population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/230111_evolution_constrained/gen99/population.npy')
+    rand = np.random.random(size=(pop_size, 7)) * 20 - 10
+
+
+    if fit_w8_w9:
+        w_8 = np.random.random((pop_size, 1)) * 20 -10
+        w_9 = np.random.random(size=(pop_size, 1)) * 20-10
+    else:
+        w_8 = np.ones((pop_size, 1))
+        w_9 = -np.ones((pop_size, 1))
+
+    population = np.hstack((rand, w_8,  w_9))
+
+    fitnesses = simulator.get_fitnesses_par(population, n_worms)
+    for i in range(n_gens):
+
+        save_p = os.path.join(save_path, 'gen' + str(i))
+        os.makedirs(save_p, exist_ok=True)
+
+        np.save(save_p + '/population.npy', population)
+        np.save(save_p + '/fitnesses.npy', fitnesses)
+
+        order = np.argsort(fitnesses)[::-1]
+        fitnesses = np.array(fitnesses)[order]
+
+        population = population[order]
+
+
+        #population[int(pop_size*0.5):] = population[:int(pop_size*0.5)] + np.random.random(size = ( int(pop_size*0.5), 9)) - 0.5
+
+        #fitnesses[int(pop_size*0.5):] = simulator.get_fitnesses_par(population[int(pop_size*0.5):], n_worms)
+
+        population[int(pop_size * 0.4): int(pop_size * 0.8)] += np.random.random(size=(int(pop_size * 0.8) - int(pop_size * 0.4), 9)) * 2 - 1.
+
+        population[int(pop_size * 0.8):, :] = np.random.random(size=(pop_size - int(pop_size * 0.8), 9)) * 20 - 10
+
+        if not fit_w8_w9:
+            population[:, 3] = 1
+            population[:, 8] = -1
+
+
+        fitnesses[int(pop_size * 0.4):] = simulator.get_fitnesses_par(population[int(pop_size * 0.4):], n_worms)
+
+        print('gen', i)
+        print('max: ', np.max(fitnesses), population[0])
+        print('mean: ', np.mean(fitnesses))
 
 no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data(dir_path + '/data/behaviourdatabysector_NT.csv')
 
@@ -126,9 +179,8 @@ fit_w8_w9 = True
 params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
           speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
 
-#sol = solve_ivp(xdot, t_span, y0, t_eval = np.arange(t_span[-1]), args = (p,)).y
 
-opt = 'scan'
+opt = 'S'
 
 
 path = '/home/neythen/Desktop/Projects/worm_neural_nets/results/worm_simulation_results_NT/230111_mock/fitting_output/'
@@ -185,16 +237,18 @@ elif opt == 'P':  # plot
     plt.show()
 
 elif opt == 'scan':  # quick param scan after arantza's email
-    starting_weights = np.load(path + 'weights_population.npy')[0]
+    starting_w1= np.load(path + 'weights_population.npy')[2]
+    starting_w2= np.load(path + 'weights_population.npy')[15]
+    starting_weights = np.append(starting_w1, starting_w2)
 
     print(starting_weights)
     all_test_weights = []
     for w_1 in range(-10, 11, 2):
 
-        for w_9 in range(-10, 11, 2):
+        for w_3 in range(-10, 11, 2):
             test_weights = copy.deepcopy(starting_weights)
             test_weights[0] = w_1
-            test_weights[8] = w_9
+            test_weights[2] = w_3
             all_test_weights.append(test_weights)
     print(len(all_test_weights))
     all_sectors = simulator.run_experiment_par(all_test_weights, n_worms)
@@ -217,26 +271,10 @@ elif opt == 'scan':  # quick param scan after arantza's email
 
 
 
-elif opt == 'T': # test
-    n_worms = 1000
-
-    population = np.load(path + 'gen144/population.npy')
-    fitnesses = np.load(path + 'gen144/fitnesses.npy')
-    order = np.argsort(fitnesses)[::-1]
-    print(order)
-
-    t = time.time()
-    fitnesses = simulator.get_fitnesses_par(population, n_worms)
-    print(time.time() - t)
-    order = np.argsort(fitnesses)[::-1]
-    print(order)
-
-    np.save(path + 'population.npy', population)
-    np.save(path + 'fitnesses.npy', fitnesses)
 
 elif opt == 'S': # simulate
     population = np.load(
-        path + '/weights_population.npy')
+        path + '/new_weights_population.npy')
 
     fitnesses = np.load(path + '/final_fitnesses.npy')
 
@@ -245,20 +283,11 @@ elif opt == 'S': # simulate
 
     weights = population[0]
 
-    # positive weights
-    params[10] = weights[0]
-    params[15] = weights[1]
-    params[16] = weights[2]
-    params[17] = weights[3]
+    print(weights)
 
-    # negative weights
-    params[11] = weights[4]
-    params[12] = weights[5]
-    params[13] = weights[6]
-    params[14] = weights[7]
-    params[18] = weights[8]
 
-    sol = simulator.forward_euler(simulator.y0, params)
+
+    sol = simulator.forward_euler(simulator.y0, weights)
 
     print(simulator.score_worm(sol))
 

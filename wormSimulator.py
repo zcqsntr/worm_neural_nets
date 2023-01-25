@@ -8,7 +8,7 @@ from itertools import repeat
 
 class WormSimulator():
     def __init__(self, dataset, dt, t_span=[0,1200], y0=[0, 0, 0, 0, 0, 0, 0, 0]):
-        self.params =[4, 15, 2, 0.5, 0, 2, 0, 0, 0, 0.11, 2, -2, -2, -2, -2, 2, 2, 1, -1, False, None] # [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
+        self.params =[4, 15, 2, 0.5, 0, 2, 0, 0, 0, 0.11, False, None] # [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,speed, worm_trapped, conc_interval]
         self.dt = dt
         self.t_span = t_span  # s
         self.y0 = y0
@@ -49,13 +49,15 @@ class WormSimulator():
         else:
             return 0
 
-    def xdot(self, t, X, p):
+    def xdot(self, t, X, weights, p):
 
         plate_r = 3
 
+        w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9 = weights
+
         AWC_v, AWC_f, AWC_s, AIB_v, AIA_v, AIY_v, x, y = X
 
-        AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7,w_8, w_9, worm_trapped, conc_interval = p
+        AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0, speed, worm_trapped, conc_interval = p
 
         conc = self.concentration_func(x, y, t, conc_interval)
 
@@ -205,7 +207,7 @@ class WormSimulator():
 
         return sectors
 
-    def run_experiment(self, params, n_worms):
+    def run_experiment(self, weights, n_worms):
         sectors = []
 
         for i in range(n_worms):
@@ -213,7 +215,7 @@ class WormSimulator():
             self.theta = np.random.random() * 2 * np.pi
             self.last_sample = 0
 
-            sol = self.forward_euler(self.y0, params)
+            sol = self.forward_euler(self.y0, weights)
 
             sector = self.score_worm(sol)
 
@@ -239,20 +241,8 @@ class WormSimulator():
 
         params = self.params
 
-        # positive weights
-        params[10] = weights[0]
-        params[15] = weights[1]
-        params[16] = weights[2]
-        params[17] = weights[3]
 
-        # negative weights
-        params[11] = weights[4]
-        params[12] = weights[5]
-        params[13] = weights[6]
-        params[14] = weights[7]
-        params[18] = weights[8]
-
-        sectors = self.run_experiment(params, n_worms)
+        sectors = self.run_experiment(params, weights, n_worms)
         fitness = self.fitness_from_sectors(sectors)
 
         #print((abs(mean_score - ms), abs(mean_range - mr), abs(std_score - ss),abs(std_range - sr),abs(skew_score - sks),abs(skew_range - skr)))
@@ -286,41 +276,24 @@ class WormSimulator():
         return fitnesses
 
     def run_experiment_wrapper(self, weights, n_worms):
-        params = self.params
 
-        # positive weights
-        params[10] = weights[0]
-        params[15] = weights[1]
-        params[16] = weights[2]
-        params[17] = weights[3]
-
-        # negative weights
-        params[11] = weights[4]
-        params[12] = weights[5]
-        params[13] = weights[6]
-        params[14] = weights[7]
-        params[18] = weights[8]
-
-        sectors = self.run_experiment(params, n_worms)
+        sectors = self.run_experiment(weights, n_worms)
         return sectors
 
-    def run_experiment_par(self, population, n_worms):
+    def run_experiment_par(self, weights_population, n_worms):
         n_cores = int(mp.cpu_count())
 
         with Pool(n_cores) as pool:
-            sectors = pool.starmap(self.run_experiment_wrapper, zip(population, repeat(n_worms)))
+            sectors = pool.starmap(self.run_experiment_wrapper, zip(weights_population, repeat(n_worms)))
 
         return sectors
 
-    def forward_euler(self, y0, params):
-
-
-
+    def forward_euler(self, y0, weights):
         y = y0
         all_ys = [y0]
         tmax = self.t_span[-1]
         for t in np.arange(0, tmax+self.dt, self.dt):
-            y = y + np.array(self.xdot(t, y, params))*self.dt
+            y = y + np.array(self.xdot(t, y, weights, self.params))*self.dt
             all_ys.append(y)
 
         return np.array(all_ys).T
