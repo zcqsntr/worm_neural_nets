@@ -153,7 +153,7 @@ dataset = no_cond_odour
 print(len(dataset))
 n_worms = len(dataset)# number of worms in each experiment
 
-n_worms = 2
+
 
 w_1 = w_6 = w_7 = 1.5 # +ve weights
 w_2 = w_3 = w_4 = w_5  = -1.5 # -ve weights
@@ -237,8 +237,8 @@ elif opt == 'scan':  # quick param scan after arantza's email
 
             for dw_3 in range(-10, 11, 2):
                 test_weights = copy.deepcopy(starting_weights)
-                test_weights[0] -= w_1
-                test_weights[2] -= w_3
+                test_weights[0] -= dw_1
+                test_weights[2] -= dw_3
                 all_test_weights.append(test_weights)
     print(len(all_test_weights))
     all_sectors = simulator.run_experiment_par(all_test_weights, n_worms)
