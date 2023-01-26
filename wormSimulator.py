@@ -23,6 +23,24 @@ class WormSimulator():
     def gaussian(self, x, mu, sig):
         return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
 
+
+    def set_mode(self, mode):
+
+        if mode == 'C':
+            worm_trapped = True
+            conc_interval = [10, 40]
+            max_t = 70
+
+            self.t_span = [0, max_t]
+            self.params[-1] = conc_interval
+            self.params[-2] = worm_trapped
+
+        else:
+
+            self.t_span = [0, 1200]
+            self.params[-1] = None
+            self.params[-2] = False
+
     def concentration_func(self, x,y,t, t_interval = None):
 
         origin = np.array([4.5, 0.])

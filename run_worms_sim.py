@@ -21,6 +21,99 @@ def load_params(param_file):
     return params
 
 
+def run_behaviour_assay(simulator, weights):
+    simulator.set_mode('B')
+    all_sectors, all_sols = simulator.run_experiment_par(weights, n_worms)
+    data_dir = os.path.join(out_dir, 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    np.save(os.path.join(data_dir, 'all_sectors.npy'), all_sectors)
+    np.save(os.path.join(data_dir, 'all_sols.npy'), all_sols)
+
+    if plot:
+        ncols = 10
+        nrows = math.ceil(len(all_sectors) / ncols)
+        fig, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 7.5))
+
+        for i, sectors in enumerate(all_sectors):
+            ax = axs[i]
+            ax.set_ylim(bottom=-6.1, top=6.1)
+            ax.violinplot(list(map(sum, sectors)))
+        plot_dir = os.path.join(out_dir, 'plots')
+        os.makedirs(plot_dir, exist_ok=True)
+        plt.savefig(os.path.join(plot_dir, 'violin_plots.pdf'))
+
+        for weights, sols in enumerate(all_sols):
+            weights_dir = os.path.join(plot_dir, 'sols', 'weights' + str(weights))
+            os.makedirs(weights_dir, exist_ok=True)
+            for worm, sol in enumerate(sols):
+                simulator.plot_sol(sol, save_path=os.path.join(weights_dir, 'worm' + str(worm)))
+
+
+def run_calcium_experiments(simulator, weights):
+    simulator.set_mode('C')
+
+    _, calcium_sims = simulator.run_experiment_par(weights, n_worms=1)
+
+    data_dir = os.path.join(out_dir, 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    np.save(os.path.join(data_dir, 'calcium_sims.npy'), calcium_sims)
+
+
+    if plot:
+        ncols = 10
+        fig, axs = plt.subplots(nrows=10, ncols=ncols, figsize=(15, 7.5))
+
+        plot_dir = os.path.join(out_dir, 'plots')
+        os.makedirs(plot_dir, exist_ok=True)
+
+        for i, c_sim in enumerate(calcium_sims):
+            c_sim = c_sim[0] #just one worm
+            # add to the summary plot
+            r = i // ncols
+            c = i % ncols
+            ax = axs[r, c]
+            alpha = 0.5
+            lw = 1
+            max_t = simulator.t_span[-1]
+            dt = simulator.dt
+
+            ax.plot(np.arange(0, max_t, dt), c_sim[0, 1:-1], label='AWC', alpha=alpha, lw=lw)
+            ax.plot(np.arange(0, max_t, dt), c_sim[3, 1:-1], label='AIB', alpha=alpha, lw=lw)
+            ax.plot(np.arange(0, max_t, dt), c_sim[5, 1:-1], label='AIY', alpha=alpha, lw=lw)
+            # ax.plot(np.arange(0, max_t, dt), c_sim[4, 1:-1], label='AIA', alpha = alpha, lw = lw) #uncomment this line to plot AIA
+            ax.set_title('worm ' + str(i + 1), fontsize=10)
+            if r == 0 and c == 0:
+                ax.legend(loc=2, bbox_to_anchor=(0, 2.2))
+
+            if c != 0:
+                ax.set_yticklabels([])
+
+            if r != 9:
+                ax.set_xticklabels([])
+
+            # create the detailed plot
+            d_fig, d_axs = plt.subplots(2, 2, figsize=(12.0, 8.0))
+            p_c = plt.rcParams['axes.prop_cycle']
+            colours = p_c.by_key()['color']
+
+            inds = [0, 3, 5, 4]
+            labels = ['AWC', 'AIB', 'AIY', 'AIA']
+            for j in range(4):
+                d_axs[j // 2, j % 2].plot(np.arange(0, max_t, dt), c_sim[inds[j], 1:-1], label=labels[j], c=colours[j])
+                d_axs[j // 2, j % 2].legend()
+                d_axs[j // 2, j % 2].set_xlabel('Time (s)')
+                d_axs[j // 2, j % 2].set_ylabel('Neuron voltage')
+
+
+
+            d_fig.suptitle('worm ' + str(i + 1))
+            os.makedirs(os.path.join(plot_dir, 'detailed_calcium'), exist_ok=True)
+            d_fig.savefig(os.path.join(plot_dir, 'detailed_calcium', 'weights' + str(i + 1) + '.pdf'))
+
+
+        fig.savefig(os.path.join(plot_dir, 'calcium_plots.pdf'))
+
+
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -36,7 +129,7 @@ parser = argparse.ArgumentParser(description='run worm simulations')
 parser.add_argument('--weights_file',  type=str, help='input parameter file, can be csv or saved numpy array')
 parser.add_argument('--weights',  type=str, help='can be used to quickly simulate a set of parameters, either this or --in_file must be specified, if both specified --in_file will be used')
 parser.add_argument('--out_dir', type=str, help='directory to save results in, default is ./working_dir')
-parser.add_argument('--plot', type=str, help='1 to plot 0 to not, default is 0')
+parser.add_argument('--plot', type=str, help='1 to plot 0 to not, default is 1')
 parser.add_argument('--opt', type=str, help='A to run behaviour assay, C to run calcium plot, B to run both, default is B')
 parser.add_argument('--n_worms', type=str, help='number of worms to simulate in each experiment for the violin plots, default is 100. If --calcium=1 this argument is ignored as only one worm is required')
 
@@ -52,7 +145,7 @@ if __name__ == '__main__':
     else:
         opt = 'B'
 
-    plot = args.plot == '1'
+    plot = (args.plot == '1' or args.plot is None)
     out_dir = 'working_dir' if args.out_dir is None else args.out_dir
     n_worms = int(args.n_worms) if args.n_worms is not None else 100
 
@@ -68,82 +161,15 @@ if __name__ == '__main__':
         raise ValueError('weights must have shape (-1, 9) current weights shape = {}'.format(weights.shape))
 
     if opt in ['A', 'B']:
-        all_sectors, all_sols = simulator.run_experiment_par(weights, n_worms)
-        data_dir = os.path.join(out_dir, 'data')
-        os.makedirs(data_dir, exist_ok=True)
-        np.save(os.path.join(data_dir, 'all_sectors.npy'), all_sectors)
-        np.save(os.path.join(data_dir, 'all_sols.npy'), all_sols)
-
-
-        if plot:
-            ncols = 10
-            nrows = math.ceil(len(all_sectors) / ncols)
-            fig, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 7.5))
-
-            for i, sectors in enumerate(all_sectors):
-                print(sectors)
-                ax = axs[i]
-                ax.set_ylim(bottom=-6.1, top=6.1)
-                ax.violinplot(list(map(sum, sectors)))
-            plot_dir = os.path.join(out_dir, 'plots')
-            os.makedirs(plot_dir, exist_ok=True)
-            plt.savefig(os.path.join(plot_dir, 'violin_plots.pdf'))
-
-            for weights,sols in enumerate(all_sols):
-                weights_dir = os.path.join(plot_dir, 'sols', 'weights'+str(weights))
-                os.makedirs(weights_dir, exist_ok=True)
-                for worm,sol in enumerate(sols):
-                    simulator.plot_sol(sol, save_path=os.path.join(weights_dir, 'worm' + str(worm)))
-
-
+        run_behaviour_assay(simulator, weights)
 
     if opt in ['C', 'B']:
-        worm_trapped = True
-        conc_interval = [10, 40]
-        max_t = 70
-        params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-                  speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
-
-        #population = np.load(path + 'gen99/population.npy')
-
-        population = np.load(path + 'weights_population.npy')
-        ncols = 10
-        fig, axs = plt.subplots(nrows=10, ncols=ncols, figsize=(15, 7.5))
-        calcium_sims = []
-
-        for i in range(len(population)):
-            weights = population[i]
-
-            # positive weights
-            params[10] = weights[0]
-            params[15] = weights[1]
-            params[16] = weights[2]
-            params[17] = weights[3]
-
-            # negative weights
-            params[11] = weights[4]
-            params[12] = weights[5]
-            params[13] = weights[6]
-            params[14] = weights[7]
-            params[18] = weights[8]
-
-            simulator.t_span[-1] = max_t
-            solution = simulator.forward_euler(simulator.y0, params)
-            calcium_sims.append(solution)
-
-            # plot neuron voltages
-
-            ax = axs[i // ncols, i  % ncols]
-            ax.set_ylim(bottom=-1., top = 1.)
-            ax.plot(np.arange(0, max_t, simulator.dt), solution[0, 1:-1], label='AWC')
-            ax.plot(np.arange(0, max_t, simulator.dt), solution[3, 1:-1], label='AIB')
-            ax.plot(np.arange(0, max_t, simulator.dt), solution[5, 1:-1], label='AIY')
-            ax.legend()
-            ax.set_xlabel('Time (s)')
-            ax.set_ylabel('Neuron voltages')
+        run_calcium_experiments(simulator, weights)
 
 
-            #simulator.plot_conc()
+
+
+
 
 
 
