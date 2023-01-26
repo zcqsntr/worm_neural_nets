@@ -10,11 +10,6 @@ from load_data import load_data
 from wormSimulator import WormSimulator
 
 
-
-
-
-
-
 def param_scan(simulator, start, stop, step, save_path = './working_dir/param_scan', plot=True):
     os.makedirs(save_path, exist_ok = True)
     population = np.arange(start, stop, step).reshape(-1, 1)
@@ -37,8 +32,6 @@ def param_scan(simulator, start, stop, step, save_path = './working_dir/param_sc
 
 
 def evolve_constraints(simulator, n_gens, pop_size, save_path = './working_dir/sexual'):
-
-
 
     #population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_aversive/221216_evolution_constrained/gen192/population.npy')
     rand = np.random.random(size=(pop_size, 7)) * 20 - 10

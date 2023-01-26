@@ -7,20 +7,13 @@ import multiprocessing as mp
 from itertools import repeat
 
 class WormSimulator():
-    def __init__(self, dataset, dt, t_span=[0,1200], y0=[0, 0, 0, 0, 0, 0, 0, 0]):
+    def __init__(self, dt, t_span=[0,1200], y0=[0, 0, 0, 0, 0, 0, 0, 0]):
         self.params =[4, 15, 2, 0.5, 0, 2, 0, 0, 0, 0.11, False, None] # [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,speed, worm_trapped, conc_interval]
         self.dt = dt
         self.t_span = t_span  # s
         self.y0 = y0
         self.theta = np.random.random() * 2 * np.pi
-        self.dataset = dataset
-        self.ms = np.mean(list(map(sum, self.dataset)))
-        self.ss = np.std(list(map(sum, self.dataset)))
-        self.sks = stats.skew(list(map(sum, self.dataset)))
 
-        self.mr = np.mean(list(map(lambda x: max(x) - min(x), self.dataset)))
-        self.sr = np.std(list(map(lambda x: max(x) - min(x), self.dataset)))
-        self.skr = stats.skew(list(map(lambda x: max(x) - min(x), self.dataset)))
         self.plate_r = 3
         self.origin = np.array([4.5, 0])
         self.domain =[-3,3]
@@ -152,7 +145,7 @@ class WormSimulator():
         axs[2].plot(solution[6,:], solution[7,:])
         axs[2].scatter(solution[6,0], solution[7,0], label = 'start')
         axs[2].scatter(solution[6,-1], solution[7,-1], label = 'end')
-        #axs[2].set_box_aspect(1)
+        axs[2].set_box_aspect(1)
 
 
         axs[2].set_xlim(self.domain[0], self.domain[1])
@@ -161,7 +154,7 @@ class WormSimulator():
         axs[2].legend(loc = 'lower left')
 
         if save_path is not None:
-            plt.savefig(os.path.join(save_path, 'worm.pdf'))
+            plt.savefig(os.path.join(save_path))
 
 
     def plot_conc(self):
@@ -213,7 +206,7 @@ class WormSimulator():
 
     def run_experiment(self, weights, n_worms):
         sectors = []
-
+        sols = []
         for i in range(n_worms):
 
             self.theta = np.random.random() * 2 * np.pi
@@ -224,11 +217,12 @@ class WormSimulator():
             sector = self.score_worm(sol)
 
             sectors.append(sector)
+            sols.append(sol)
 
 
-        return sectors
+        return sectors, sols
 
-    def fitness_from_sectors(self, sectors):
+    def fitness_from_sectors(self, sectors, dataset):
         mean_score = np.mean(list(map(sum, sectors)))
         std_score = np.std(list(map(sum, sectors)))
         skew_score = stats.skew(list(map(sum, sectors)))
@@ -236,30 +230,38 @@ class WormSimulator():
         std_range = np.std(list(map(lambda x: max(x) - min(x), sectors)))
         skew_range = stats.skew(list(map(lambda x: max(x) - min(x), sectors)))
 
-        fitness = - (abs(mean_score - self.ms) + abs(mean_range - self.mr) + abs(std_score - self.ss) + abs(std_range - self.sr) + abs(
-            skew_score - self.sks) + abs(skew_range - self.skr))
+        ms = np.mean(list(map(sum, dataset)))
+        ss = np.std(list(map(sum, dataset)))
+        sks = stats.skew(list(map(sum, dataset)))
+
+        mr = np.mean(list(map(lambda x: max(x) - min(x), dataset)))
+        sr = np.std(list(map(lambda x: max(x) - min(x), dataset)))
+        skr = stats.skew(list(map(lambda x: max(x) - min(x), dataset)))
+
+        fitness = - (abs(mean_score - ms) + abs(mean_range - mr) + abs(std_score - ss) + abs(std_range - sr) + abs(
+            skew_score - sks) + abs(skew_range - skr))
 
         return fitness
 
-    def get_fitness(self, weights, n_worms):
+    def get_fitness(self, weights, n_worms, dataset):
 
         params = self.params
 
 
-        sectors = self.run_experiment(params, weights, n_worms)
-        fitness = self.fitness_from_sectors(sectors)
+        sectors, sol = self.run_experiment(params, weights, n_worms)
+        fitness = self.fitness_from_sectors(sectors, dataset)
 
         #print((abs(mean_score - ms), abs(mean_range - mr), abs(std_score - ss),abs(std_range - sr),abs(skew_score - sks),abs(skew_range - skr)))
         return fitness
 
-    def get_fitnesses(self, population, n_worms):
+    def get_fitnesses(self, population, n_worms, dataset):
 
         # values form the no cond no odor dat
         fitnesses = []
 
 
         for p in population:
-            fitness = self.get_fitness(p, n_worms)
+            fitness, sol = self.get_fitness(p, n_worms, dataset)
             '''
             print('score', abs(mean_score),  'score std',abs(std_score), 'range', abs(mean_range), 'range std', abs(std_range))
             print('score error', abs(mean_score-ms),'score std error', abs(std_score-ss),  'range error', abs(mean_range-mr), 'range std error', abs(std_range-sr))
@@ -271,11 +273,11 @@ class WormSimulator():
         print('done')
         return fitnesses
 
-    def get_fitnesses_par(self, population, n_worms):
+    def get_fitnesses_par(self, population, n_worms, dataset):
         n_cores = int(mp.cpu_count())
 
         with Pool(n_cores) as pool:
-            fitnesses = pool.starmap(self.get_fitness, zip(population, repeat(n_worms)))
+            fitnesses, sols = pool.starmap(self.get_fitness, zip(population, repeat(n_worms), repeat(dataset)))
 
         return fitnesses
 
@@ -284,9 +286,10 @@ class WormSimulator():
         n_cores = int(mp.cpu_count())
 
         with Pool(n_cores) as pool:
-            sectors = pool.starmap(self.run_experiment, zip(weights_population, repeat(n_worms)))
-
-        return sectors
+            results = pool.starmap(self.run_experiment, zip(weights_population, repeat(n_worms)))
+        sectors = [res[0] for res in results]
+        sols = [res[1] for res in results]
+        return sectors, sols
 
     def forward_euler(self, y0, weights):
         y = y0

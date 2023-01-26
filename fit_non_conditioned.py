@@ -16,26 +16,6 @@ if not on_cluster:
     import matplotlib.pyplot as plt
 
 
-
-def param_scan(simulator, start, stop, step, save_path = dir_path + '/working_dir/param_scan', plot=True):
-    os.makedirs(save_path, exist_ok = True)
-    population = np.arange(start, stop, step).reshape(-1, 1)
-
-    fitnesses, all_sectors  = simulator.get_fitnesses(population)
-
-
-
-    if plot:
-        plt.plot(population, fitnesses)
-
-
-    np.save(save_path + '/params.npy',population)
-    np.save(save_path + '/fitnesses.npy',fitnesses)
-    np.save(save_path + '/sectors.npy', all_sectors)
-
-    if plot:
-        plt.show()
-
 def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/working_dir/non_cond'):
 
 
@@ -65,8 +45,6 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/wor
 
         population = population[order]
 
-
-
         population[int(pop_size * 0.4): int(pop_size * 0.8)] += np.random.random(size=(int(pop_size * 0.8) - int(pop_size * 0.4), 9)) * 2 - 1.
 
         # set weights to 0 if they break the sign constraints
@@ -74,27 +52,16 @@ def evolve_constraints(simulator, n_gens, pop_size, save_path = dir_path + '/wor
 
 
         population[int(pop_size * 0.8):,:] = np.hstack([np.random.random(size = (pop_size - int(pop_size * 0.8), 1))*10*w for w in w_signs],  w_8,  w_9)
-
-
-
-
         if not fit_w8_w9:
             population[:, 3] = 1
             population[:, 8] = -1
-
-
-
-
-
-        fitnesses[int(pop_size*0.4):] = simulator.get_fitnesses_par(population[int(pop_size*0.4):], n_worms)
+        fitnesses[int(pop_size*0.4):] = simulator.get_fitnesses_par(population[int(pop_size*0.4):], n_worms, dataset)
 
         print('gen', i)
         print('max: ', np.max(fitnesses), population[0])
         print('mean: ', np.mean(fitnesses))
 
 def evolve(simulator, n_gens, pop_size, save_path = './working_dir/aversive'):
-
-
 
     #population = np.load('/home/neythen/Desktop/Projects/worm_neural_nets/results/fitting_unconditioned/230111_evolution_constrained/gen99/population.npy')
     rand = np.random.random(size=(pop_size, 7)) * 20 - 10
@@ -137,44 +104,45 @@ def evolve(simulator, n_gens, pop_size, save_path = './working_dir/aversive'):
             population[:, 8] = -1
 
 
-        fitnesses[int(pop_size * 0.4):] = simulator.get_fitnesses_par(population[int(pop_size * 0.4):], n_worms)
+        fitnesses[int(pop_size * 0.4):] = simulator.get_fitnesses_par(population[int(pop_size * 0.4):], n_worms, dataset)
 
         print('gen', i)
         print('max: ', np.max(fitnesses), population[0])
         print('mean: ', np.mean(fitnesses))
 
-no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data(dir_path + '/data/behaviourdatabysector_NT.csv')
+sample_t_data, mock_data, aversive_data, sex_data = load_data(dir_path + '/data/behaviourdatabysector_NT.csv')
 
 n_gens = 100
 pop_size = 100
 
+opt = 'scan'
+worm_type = 'M' # one of M, A, S for mock, aversive and sexual
 
-dataset = no_cond_odour
+if worm_type == 'M':
+    dataset = mock_data
+elif worm_type == 'A':
+    dataset = aversive_data
+elif worm_type == 'S':
+    dataset = sex_data
+
+
 print(len(dataset))
 n_worms = len(dataset)# number of worms in each experiment
 
-
-
-w_1 = w_6 = w_7 = 1.5 # +ve weights
-w_2 = w_3 = w_4 = w_5  = -1.5 # -ve weights
-w_8 = 1
-w_9 = -1
-
-
-
-simulator = WormSimulator(dataset = dataset, dt = 0.005)
+simulator = WormSimulator(dt = 0.005)
 worm_trapped = False
 conc_interval = None
 fit_w8_w9 = True
 
 
-opt = 'scan'
-
-
 path = './results/worm_simulation_results_NT/230111_mock/fitting_output/'
 
 if opt == 'E': # evolve
-    evolve_constraints(simulator, n_gens, pop_size)
+    if worm_type == 'M':
+        evolve_constraints(simulator, n_gens, pop_size)
+    else:
+        evolve(simulator, n_gens, pop_size)
+
 elif opt == 'P':  # plot
     t = time.time()
     population = np.load(path + 'weights_population.npy')
@@ -237,8 +205,8 @@ elif opt == 'scan':  # quick param scan after arantza's email
 
             for dw_3 in range(-10, 11, 2):
                 test_weights = copy.deepcopy(starting_weights)
-                test_weights[0] -= dw_1
-                test_weights[2] -= dw_3
+                test_weights[0] -= w_1
+                test_weights[2] -= w_3
                 all_test_weights.append(test_weights)
     print(len(all_test_weights))
     all_sectors = simulator.run_experiment_par(all_test_weights, n_worms)
@@ -258,8 +226,6 @@ elif opt == 'scan':  # quick param scan after arantza's email
         solution = simulator.forward_euler(simulator.y0, weights)
         calcium_sims.append(solution)
     np.save(path + 'param_scan/calcium_sims.npy', calcium_sims)
-
-
 
 elif opt == 'S': # simulate
     population = np.load(
