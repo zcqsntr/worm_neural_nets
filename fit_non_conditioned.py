@@ -128,6 +128,7 @@ elif worm_type == 'S':
 
 print(len(dataset))
 n_worms = len(dataset)# number of worms in each experiment
+n_worms = 100
 
 simulator = WormSimulator(dt = 0.005)
 worm_trapped = False
@@ -155,7 +156,7 @@ elif opt == 'P':  # plot
 
     all_sectors = []
 
-    all_sectors = simulator.run_experiment_par(population, n_worms)
+    all_sectors, sols = simulator.run_experiment_par(population, n_worms)
     np.save(path + 'all_sectors.npy', all_sectors)
     ncols = 5
     fig, axs = plt.subplots(nrows=5, ncols=ncols, figsize=(15, 7.5))
@@ -195,6 +196,7 @@ elif opt == 'P':  # plot
 elif opt == 'scan':  # quick param scan after arantza's email
     starting_w1 = np.load(path + 'weights_population.npy')[2]
     starting_w2 = np.load(path + 'weights_population.npy')[15]
+    print(starting_w1)
 
     print(starting_w1, starting_w2)
 
@@ -205,24 +207,29 @@ elif opt == 'scan':  # quick param scan after arantza's email
 
             for dw_3 in range(-10, 11, 2):
                 test_weights = copy.deepcopy(starting_weights)
-                test_weights[0] -= w_1
-                test_weights[2] -= w_3
+                test_weights[0] -= dw_1
+                test_weights[2] -= dw_3
                 all_test_weights.append(test_weights)
     print(len(all_test_weights))
-    all_sectors = simulator.run_experiment_par(all_test_weights, n_worms)
-    np.save(path + 'param_scan/all_sectors.npy', all_sectors)
+
+    #all_sectors = simulator.run_experiment_par(all_test_weights[0:121], n_worms, return_sol = False)
+    #np.save(path + 'param_scan/all_sectors1.npy', all_sectors)
+    #print('sectors1 done')
+    #all_sectors = simulator.run_experiment_par(all_test_weights[121:], n_worms, return_sol = False)
+
+    #np.save(path + 'param_scan/all_sectors2.npy', all_sectors)
+    #print('sectors2 done')
 
     worm_trapped = True
     conc_interval = [10, 40]
     max_t = 70
     calcium_sims = []
-
+    simulator.set_mode('C')
     for i in range(len(all_test_weights)):
-        print(i)
+
         weights = all_test_weights[i]
+        print(weights)
 
-
-        simulator.t_span[-1] = max_t
         solution = simulator.forward_euler(simulator.y0, weights)
         calcium_sims.append(solution)
     np.save(path + 'param_scan/calcium_sims.npy', calcium_sims)

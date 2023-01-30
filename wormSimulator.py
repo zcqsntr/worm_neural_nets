@@ -56,7 +56,7 @@ class WormSimulator():
             if t_interval is None:
                 return self.gaussian(dist, mu=0, sig=std)*100
             else:
-                return self.gaussian(dist, mu=0, sig=std)*5
+                return self.gaussian(dist, mu=0, sig=std)*100
         else:
             return 0
 
@@ -222,7 +222,7 @@ class WormSimulator():
 
         return sectors
 
-    def run_experiment(self, weights, n_worms):
+    def run_experiment(self, weights, n_worms, return_sol = False):
         sectors = []
         sols = []
         for i in range(n_worms):
@@ -237,8 +237,10 @@ class WormSimulator():
             sectors.append(sector)
             sols.append(sol)
 
-
-        return sectors, sols
+        if return_sol:
+            return sectors, sols
+        else:
+            return sectors
 
     def fitness_from_sectors(self, sectors, dataset):
         mean_score = np.mean(list(map(sum, sectors)))
@@ -300,14 +302,18 @@ class WormSimulator():
         return fitnesses
 
 
-    def run_experiment_par(self, weights_population, n_worms):
+    def run_experiment_par(self, weights_population, n_worms, return_sol = True):
         n_cores = int(mp.cpu_count())
 
         with Pool(n_cores) as pool:
-            results = pool.starmap(self.run_experiment, zip(weights_population, repeat(n_worms)))
-        sectors = [res[0] for res in results]
-        sols = [res[1] for res in results]
-        return sectors, sols
+            results = pool.starmap(self.run_experiment, zip(weights_population, repeat(n_worms), repeat(return_sol)))
+
+        if return_sol:
+            sectors = [res[0] for res in results]
+            sols = [res[1] for res in results]
+            return sectors, sols
+        else:
+            return results
 
     def forward_euler(self, y0, weights):
         y = y0
