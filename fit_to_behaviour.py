@@ -128,7 +128,6 @@ elif worm_type == 'S':
 
 print(len(dataset))
 n_worms = len(dataset)# number of worms in each experiment
-n_worms = 100
 
 simulator = WormSimulator(dt = 0.005)
 worm_trapped = False
@@ -144,7 +143,7 @@ if opt == 'E': # evolve
     else:
         evolve(simulator, n_gens, pop_size)
 
-elif opt == 'P':  # plot
+elif opt == 'P':  # plot violin plots
     t = time.time()
     population = np.load(path + 'weights_population.npy')
     fitnesses = np.load(path + 'final_fitnesses.npy')
@@ -170,10 +169,7 @@ elif opt == 'P':  # plot
     for i, sectors in enumerate(all_sectors):
 
         ax = axs[i // ncols, i  % ncols]
-
-
         ax.set_ylim(bottom=-6.1, top=6.1)
-
         ax.violinplot(list(map(sum, dataset)))
         ax.violinplot(list(map(sum, sectors)))
 
@@ -254,11 +250,7 @@ elif opt == 'S': # simulate
     plt.show()
 
 elif opt == 'C': # test worm in the calcium imaging experiment
-    worm_trapped = True
-    conc_interval = [10, 40]
-    max_t = 70
-    params = [AWC_f_a, AWC_f_b, AWC_s_gamma, tm, AWC_v0, AWC_gain, AIB_v0, AIA_v0, AIY_v0,
-              speed, w_1, w_2, w_3, w_4, w_5, w_6, w_7, w_8, w_9, worm_trapped, conc_interval]
+    simulator.set_mode('C')
 
     #population = np.load(path + 'gen99/population.npy')
 
@@ -267,26 +259,14 @@ elif opt == 'C': # test worm in the calcium imaging experiment
     fig, axs = plt.subplots(nrows=10, ncols=ncols, figsize=(15, 7.5))
     calcium_sims = []
 
+
     for i in range(len(population)):
         weights = population[i]
 
-        # positive weights
-        params[10] = weights[0]
-        params[15] = weights[1]
-        params[16] = weights[2]
-        params[17] = weights[3]
 
-        # negative weights
-        params[11] = weights[4]
-        params[12] = weights[5]
-        params[13] = weights[6]
-        params[14] = weights[7]
-        params[18] = weights[8]
-
-        simulator.t_span[-1] = max_t
-        solution = simulator.forward_euler(simulator.y0, params)
+        solution = simulator.forward_euler(simulator.y0, weights)
         calcium_sims.append(solution)
-
+        max_t = simulator.t_span[-1]
         # plot neuron voltages
 
         ax = axs[i // ncols, i  % ncols]

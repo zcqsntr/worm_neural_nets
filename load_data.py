@@ -1,4 +1,4 @@
-
+import matplotlib.pyplot as plt
 import numpy as np
 
 def int_wrap(string):
@@ -35,9 +35,20 @@ def load_data(file):
 
 
 
-'''
-for d in [no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour]:
-    plt.figure()
-    plt.violinplot(list(map(sum, d)))
-    
-'''
+if __name__ == '__main__':
+
+
+    no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour = load_data('./data/behaviourdatabysector_NT.csv')
+    for d in [no_cond_no_odour, no_cond_odour, aversive_odour, sex_odour]:
+        print(len(d))
+    for d in [no_cond_odour]:
+        plt.figure(figsize = (2,1.5))
+        plt.violinplot(list(map(sum, d)))
+        plt.ylabel('Score')
+        plt.gca().set_xticks([])
+        plt.xticks([])
+        plt.savefig('data_plot.pdf')
+
+
+    plt.show()
+
